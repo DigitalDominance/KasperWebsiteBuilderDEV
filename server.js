@@ -21,7 +21,7 @@ const app = express();
 const allowedOrigins = [
   'https://www.kaspercoin.net',
   'https://kaspercoin.net',
-  'http://localhost:3000',
+  'https://kaspercoin.webflow.io',
   'http://localhost:8080'
 ];
 
