@@ -87,6 +87,13 @@ app.post('/start-generation', async (req, res) => {
     return res.status(400).json({ error: "walletAddress and userInputs are required." });
   }
 
+  const { coinName, colorPalette, themeSelection, projectDesc } = userInputs;
+
+  // Validate themeSelection
+  if (!themeSelection || !['dark', 'light'].includes(themeSelection.toLowerCase())) {
+    return res.status(400).json({ error: "themeSelection must be either 'dark' or 'light'." });
+  }
+
   try {
     // Decrement 1 credit
     const user = await User.findOneAndUpdate(
@@ -438,9 +445,9 @@ app.get('/get-user-generations', async (req, res) => {
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user) {
   try {
-    const { coinName, colorPalette, projectDesc } = userInputs || {};
-    if (!coinName || !colorPalette) {
-      throw new Error("Missing 'coinName' or 'colorPalette'.");
+    const { coinName, colorPalette, themeSelection, projectDesc } = userInputs || {};
+    if (!coinName || !colorPalette || !themeSelection) {
+      throw new Error("Missing 'coinName', 'colorPalette', or 'themeSelection'.");
     }
 
     progressMap[requestId].progress = 10;
@@ -481,20 +488,20 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
     const systemMessage = `
 You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
 
-- Use a gradient of  "${colorPalette}" plus either white or black for the main background, whichever contrasts best.
+- Use a gradient of "${colorPalette}" plus either white or black for the main background, whichever contrasts best based on the theme selection "${themeSelection}".
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
-- make sure the sections all have the content under its heading and not next to it. it keeps happening. stop doing that. a nice crisp layout. the heading should be next to the content rather above it
+- Make sure the sections all have the content under its heading and not next to it. It keeps happening. Stop doing that. A nice crisp layout. The heading should be next to the content rather above it.
 - Separate sections in this order:
-  1) Nav (non-sticky) with a 256x256 transparent token logo => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that dont work. (also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
+  1) Nav (non-sticky) with a 256x256 transparent token logo => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
   2) Big hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024). Must show coin name "${coinName}" and reference "${projectDesc}".
-  3) a heading and subheading component and then under a Vertical roadmap (5 steps), . Fancy. make sure their width is fitting to the screen size.
-  4) a heading and subheading component and then Tokenomics with 3 fancy gradient/glass cards. under the heading not next to. laid out horizontally on computer taking up a a whole row of screen or on mobile vertically laid out"
-  5) a heading and subheading component and then Exchange/analytics with 6 placeholders (laid out nicely). under the heading.  2 rows, 3 columns on computer that take up  wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. under the heading.
-  6) a heading and subheadin 2-card about section, .under the heading not next to and then the cards laid out horizontally and big enough to take up the whole section spacenot stacked. 
-  7) footer section at the bottom not sticky. uses FOOTER_IMAGE_PLACEHOLDER on the left and on the right it uses placeholder social links that dont work
+  3) A heading and subheading component and then under a Vertical roadmap (5 steps). Fancy. Make sure their width is fitting to the screen size.
+  4) A heading and subheading component and then Tokenomics with 3 fancy gradient/glass cards. Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+  5) A heading and subheading component and then Exchange/analytics with 6 placeholders (laid out nicely). Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+  6) A heading and subheading component and 2-card about section. Under the heading, not next to, and then the cards laid out horizontally and big enough to take up the whole section space, not stacked. 
+  7) Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left and on the right it uses placeholder social links that don't work.
 - Buttons are placeholders only. Not clickable.
-- every element must be thought to match/contrast with the other elements and make sure their is a nice flow. 
-- Contrasting color scheme, picking black or white background to complement "${colorPalette}".
+- Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+- Contrasting color scheme, picking black or white background to complement "${colorPalette}" based on "${themeSelection}".
 - No leftover code fences.
 
 Use snippet below for partial inspiration (no code fences):
@@ -510,7 +517,7 @@ ${snippetInspiration}
         { role: "system", content: systemMessage },
         {
           role: "user",
-          content: `Generate the single-file site now with placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. Must be insanely beautiful, advanced glass, colorPalette: ${colorPalette}, coinName: ${coinName}, projectDesc: ${projectDesc}. No leftover code fences.`
+          content: `Generate the single-file site now with placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. Must be insanely beautiful, advanced glass, colorPalette: ${colorPalette}, themeSelection: ${themeSelection}, coinName: ${coinName}, projectDesc: ${projectDesc}. No leftover code fences.`
         }
       ],
       max_tokens: 3500,
@@ -529,8 +536,9 @@ ${snippetInspiration}
       progressMap[requestId].progress = 45;
       const logoPrompt = `256x256 transparent token logo for a memecoin called "${coinName}". 
 color palette: "${colorPalette}", 
+theme: "${themeSelection}",
 only the coin's circular design, transparent, no extra text or background. 
-Must suit both nav & footer, pick black/white for best contrast.`;
+Must suit both nav & footer, pick black/white for best contrast based on theme.`;
       const logoResp = await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256" });
       const logoUrl = logoResp.data.data[0].url;
       const logoFetch = await fetch(logoUrl);
@@ -548,7 +556,7 @@ Must suit both nav & footer, pick black/white for best contrast.`;
     // Generate 1024x1024 hero background
     try {
       progressMap[requestId].progress = 55;
-      const bgPrompt = `1024x1024  a ${colorPalette} gradient with either black or white. u decide with fits better. make a small refrence to this character on a small section of the image"${coinName}"`;
+      const bgPrompt = `1024x1024 a ${colorPalette} gradient with a ${themeSelection === 'dark' ? 'black' : 'white'} background. Make a small reference to "${coinName}" and "${projectDesc}" in a subtle section of the image.`;
       const bgResp = await openai.createImage({ model: "dall-e-3", prompt: bgPrompt, n:1, size:"1024x1024" });
       const bgUrl = bgResp.data.data[0].url;
       const bgFetch = await fetch(bgUrl);
