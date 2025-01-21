@@ -488,7 +488,7 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
     const systemMessage = `
 You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
 
-- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. keep a consistent theming across the site, gradient and nice looks. 
+- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
 - Make sure the sections all have the content under its heading and not next to it. It keeps happening. Stop doing that. A nice crisp layout. The heading should be next to the content rather above it.
