@@ -492,13 +492,13 @@ You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/J
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
 - Make sure the sections all have the content under its heading and not next to it. A nice crisp layout.
-- Separate sections in this order:
+- Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
   1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
   2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
-  3) A heading and subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
-  4) A heading and subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
-  5) A heading and subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
-  6) A heading and subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
+  3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
+  4) A heading and under it a subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+  5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+  6) A heading and under it a subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
   7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left and on the right it uses placeholder social links that don't work. fake unclickable buttons.
 - Buttons are placeholders only. Not clickable.
 - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
