@@ -488,16 +488,17 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
     const systemMessage = `
 You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
 
-- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming.
+- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming keep a consistent theming across the site, gradient and nice looks. 
+- Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
 - Make sure the sections all have the content under its heading and not next to it. It keeps happening. Stop doing that. A nice crisp layout. The heading should be next to the content rather above it.
 - Separate sections in this order:
   1) Modern Looking Nav (non-sticky) with a 256x256 transparent token logo => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
   2) Modern Big hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024). Must show coin name "${coinName}" and reference "${projectDesc}". Space them nicely though.
-  3) A heading and subheading component and then under a Vertical roadmap (5 steps). Fancy. Make sure their width is fitting to the screen size.
-  4) A heading and subheading component and then Tokenomics with 3 fancy gradient/glass cards. Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
-  5) A heading and subheading component and then Exchange/analytics with 6 placeholders (laid out nicely). Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
-  6) A heading and subheading component and 2-card about section. Under the heading, not next to, and then the cards laid out horizontally and big enough to take up the whole section space, not stacked. 
+  3) A heading and subheading component and then under it a Vertical roadmap (5 steps). Fancy. Make sure their width is fitting to the screen size.
+  4) A heading and subheading component and then under it Tokenomics with 3 fancy gradient/glass cards. Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+  5) A heading and subheading component and then under it Exchange/analytics with 6 placeholders (laid out nicely). Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+  6) A heading and subheading component and then under it 2-card about section. Beatiful looks
   7) Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left and on the right it uses placeholder social links that don't work.
 - Buttons are placeholders only. Not clickable.
 - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
