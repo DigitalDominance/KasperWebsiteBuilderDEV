@@ -491,7 +491,7 @@ You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/J
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
-- Make sure the sections all have the content under its heading and not next to it. A nice crisp layout.
+- For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
 - Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
   1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
   2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
@@ -502,7 +502,7 @@ You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/J
   7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left and on the right it uses placeholder social links that don't work. fake unclickable buttons.
 - Buttons are placeholders only. Not clickable.
 - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-- No leftover code fences.
+- No leftover code fences just the raw output as i will insert to an iframe, no text just code.
 
 Use snippet below for partial inspiration (no code fences):
 ${snippetInspiration}
