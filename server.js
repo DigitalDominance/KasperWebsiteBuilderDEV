@@ -89,9 +89,9 @@ app.post('/start-generation', async (req, res) => {
 
   const { coinName, colorPalette, themeSelection, projectDesc } = userInputs;
 
-  // Validate themeSelection
-  if (!themeSelection || !['dark', 'light'].includes(themeSelection.toLowerCase())) {
-    return res.status(400).json({ error: "themeSelection must be either 'dark' or 'light'." });
+  // Validate that themeSelection is either "token" or "nft"
+  if (!themeSelection || !['token', 'nft'].includes(themeSelection.toLowerCase())) {
+    return res.status(400).json({ error: "themeSelection must be either 'token' or 'nft'." });
   }
 
   try {
@@ -120,7 +120,7 @@ app.post('/start-generation', async (req, res) => {
       progressMap[requestId].status = 'error';
       progressMap[requestId].progress = 100;
 
-      // Refund credit
+      // Refund credit if there's an error
       User.findOneAndUpdate({ walletAddress }, { $inc: { credits: 1 } })
         .then(() => {
           console.log(`Refunded 1 credit to ${walletAddress} due to generation failure.`);
@@ -452,7 +452,9 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 
     progressMap[requestId].progress = 10;
 
-    // A snippet for partial inspiration
+    // We'll store GPT messages for both "token" and "nft" logic.
+
+    // 1) Example snippet for partial inspiration
     const snippetInspiration = `
 <html>
 <head>
@@ -479,34 +481,44 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 </html>
 `;
 
-    // GPT system message: 
-    //  - Only ONE 256x256 "nav/footer" token logo => "NAV_IMAGE_PLACEHOLDER" and "FOOTER_IMAGE_PLACEHOLDER" are the same
-    //  - A 1024x1024 hero => "HERO_BG_PLACEHOLDER"
-    //  - Must pick black or white background for the page for better contrast with colorPalette
-    //  - Must have 6 cards for exchanges, vertical roadmap (5 steps), tokenomics (3 fancy cards), a 2-card about section, disclaimers
-    //  - Fully responsive, advanced transitions, glass sections, gradient text, etc.
-    const systemMessage = `
+    // 2) System prompt for a TOKEN site (the old logic)
+    const tokenSystemPrompt = `
 You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
 
-- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
-- Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
-- Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
-- For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
-- Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
-  1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
-  2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
-  3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
-  4) A heading and under it a subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
-  5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
-  6) A heading and under it a subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
-  7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left and on the right it uses placeholder social links that don't work. fake unclickable buttons.
-- Buttons are placeholders only. Not clickable.
-- Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-- No leftover code fences just the raw output as i will insert to an iframe, no text just code.
-
-Use snippet below for partial inspiration (no code fences):
+- Use a gradient of "${colorPalette}" for an engaging color scheme, implementing advanced glassmorphism, transitions, etc.
+- Focus on a new memecoin token named "${coinName}" with project description "${projectDesc}".
+- The site must include these placeholders for images:
+  - NAV_IMAGE_PLACEHOLDER (256x256 token logo)
+  - HERO_BG_PLACEHOLDER (1024x1024 hero background)
+  - FOOTER_IMAGE_PLACEHOLDER (256x256, same as NAV_IMAGE_PLACEHOLDER)
+- Must be fully responsive, advanced transitions, shimmer, glass, etc.
+- Use snippet below for partial inspiration (no code fences):
 ${snippetInspiration}
 `;
+
+    // 3) System prompt for an NFT site (the NEW logic)
+    const nftSystemPrompt = `
+You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
+
+- Use a gradient of "${colorPalette}" for an engaging color scheme, with advanced glassmorphism and transitions.
+- Focus on an NFT collection called "${coinName}" with the description "${projectDesc}".
+- The site must emphasize collectible artwork, NFT rarity, and a mint section (dummy button) for examples.
+- Must be fully responsive, advanced transitions, shimmer, glass, etc.
+- Include these placeholders for images:
+  - NAV_IMAGE_PLACEHOLDER (256x256 NFT brand logo)
+  - HERO_BG_PLACEHOLDER (1024x1024 hero background or NFT banner)
+  - FOOTER_IMAGE_PLACEHOLDER (same as NAV_IMAGE_PLACEHOLDER)
+- Use snippet below for partial inspiration (no code fences):
+${snippetInspiration}
+`;
+
+    // Decide which system prompt to use based on themeSelection
+    let systemMessage = null;
+    if (themeSelection.toLowerCase() === 'token') {
+      systemMessage = tokenSystemPrompt;
+    } else {
+      systemMessage = nftSystemPrompt;
+    }
 
     progressMap[requestId].progress = 20;
 
@@ -517,7 +529,7 @@ ${snippetInspiration}
         { role: "system", content: systemMessage },
         {
           role: "user",
-          content: `Generate the single-file site now with placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. Must be insanely beautiful, advanced glass, colorPalette: ${colorPalette}, themeSelection: ${themeSelection}, coinName: ${coinName}, projectDesc: ${projectDesc}. No leftover code fences.`
+          content: `Generate the single-file site now with placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. No leftover code fences. Keep it extremely modern and visually stunning.`
         }
       ],
       max_tokens: 3500,
@@ -530,15 +542,29 @@ ${snippetInspiration}
     // We'll store images in memory only (so DB doesn't bloat)
     const imagesObj = {};
 
-    // Generate ONE 256x256 logo for both nav and footer
-    // (NAV_IMAGE_PLACEHOLDER and FOOTER_IMAGE_PLACEHOLDER will get the same base64)
+    /***************************************************
+     * Generate images differently for Token vs NFT
+     **************************************************/
+    // Logo prompt
+    let logoPrompt;
+    let heroPrompt;
+
+    if (themeSelection.toLowerCase() === 'token') {
+      logoPrompt = `256x256 transparent token logo for a memecoin called "${coinName}". 
+color palette: "${colorPalette}". 
+No extra text or background. Fun, playful, circular design.`;
+      heroPrompt = `1024x1024 futuristic token-themed background with gradient of "${colorPalette}". Subtle reference to "${coinName}" and "${projectDesc}".`;
+    } else {
+      // NFT
+      logoPrompt = `256x256 unique NFT collection logo for "${coinName}". 
+color palette: "${colorPalette}". 
+No extra text or background. Vibrant, collectible style.`;
+      heroPrompt = `1024x1024 NFT banner background with gradient of "${colorPalette}". Some subtle referencing to "${coinName}" and NFT aesthetics.`;
+    }
+
+    // Generate 256x256 logo
     try {
       progressMap[requestId].progress = 45;
-      const logoPrompt = `256x256 transparent token logo for a memecoin called "${coinName}". 
-color palette: "${colorPalette}", 
-theme: "${themeSelection}",
-only the coin's circular design, transparent, no extra text or background. 
-Must suit both nav & footer, pick black/white for best contrast based on theme.`;
       const logoResp = await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256" });
       const logoUrl = logoResp.data.data[0].url;
       const logoFetch = await fetch(logoUrl);
@@ -548,7 +574,8 @@ Must suit both nav & footer, pick black/white for best contrast based on theme.`
       imagesObj.footerImg = base64Logo;    // for FOOTER_IMAGE_PLACEHOLDER
     } catch (err) {
       console.error("Nav/Footer logo error:", err);
-      const fallback = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQ...";
+      // fallback
+      const fallback = "data:image/png;base64,iVBORw0K...";
       imagesObj.navLogo = fallback;
       imagesObj.footerImg = fallback;
     }
@@ -556,15 +583,14 @@ Must suit both nav & footer, pick black/white for best contrast based on theme.`
     // Generate 1024x1024 hero background
     try {
       progressMap[requestId].progress = 55;
-      const bgPrompt = `1024x1024 a ${colorPalette} gradient with a ${themeSelection === 'dark' ? 'black' : 'white'} background. Make a small reference to "${coinName}" and "${projectDesc}" in a subtle section of the image.`;
-      const bgResp = await openai.createImage({ model: "dall-e-3", prompt: bgPrompt, n:1, size:"1024x1024" });
+      const bgResp = await openai.createImage({ prompt: heroPrompt, n:1, size:"1024x1024" });
       const bgUrl = bgResp.data.data[0].url;
       const bgFetch = await fetch(bgUrl);
       const bgBuffer = await bgFetch.arrayBuffer();
       imagesObj.heroBg = "data:image/png;base64," + Buffer.from(bgBuffer).toString("base64");
     } catch (err) {
       console.error("Hero BG error:", err);
-      imagesObj.heroBg = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAU...";
+      imagesObj.heroBg = "data:image/png;base64,iVBORw0K...";
     }
 
     progressMap[requestId].progress = 60;
