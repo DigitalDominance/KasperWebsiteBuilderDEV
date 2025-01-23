@@ -58,7 +58,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 /**************************************************
- * In-Memory Progress & Results (for FULL gen)
+ * In-Memory Progress & Results (for full gen)
  **************************************************/
 const progressMap = {};
 
@@ -79,7 +79,7 @@ app.get('/', (req, res) => {
 });
 
 /**************************************************
- * POST /start-generation (FULL site for 1 credit)
+ * POST /start-generation (full site, costs 1 credit)
  **************************************************/
 app.post('/start-generation', async (req, res) => {
   const { walletAddress, userInputs } = req.body;
@@ -100,7 +100,7 @@ app.post('/start-generation', async (req, res) => {
   }
 
   try {
-    // Decrement 1 credit
+    // Deduct 1 credit
     const user = await User.findOneAndUpdate(
       { walletAddress, credits: { $gte: 1 } },
       { $inc: { credits: -1 } },
@@ -143,7 +143,7 @@ app.post('/start-generation', async (req, res) => {
 });
 
 /**************************************************
- * GET /progress?requestId=XYZ (FULL gen status)
+ * GET /progress?requestId=XYZ (full gen progress)
  **************************************************/
 app.get('/progress', (req, res) => {
   const { requestId } = req.query;
@@ -155,7 +155,7 @@ app.get('/progress', (req, res) => {
 });
 
 /**************************************************
- * GET /result?requestId=XYZ (FULL gen final code)
+ * GET /result?requestId=XYZ (full final code)
  **************************************************/
 app.get('/result', (req, res) => {
   const { requestId } = req.query;
@@ -168,7 +168,7 @@ app.get('/result', (req, res) => {
     return res.status(400).json({ error: "Not finished or generation error." });
   }
 
-  // Replace placeholders with base64 from in-memory
+  // Insert images
   let finalCode = code;
   if (images.navLogo) {
     finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
@@ -201,7 +201,6 @@ app.get('/export', (req, res) => {
     return res.status(400).json({ error: "Invalid or missing export type. Use 'full' or 'wordpress'." });
   }
 
-  // Replace placeholders
   let finalCode = code;
   if (images.navLogo) {
     finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
@@ -443,7 +442,7 @@ app.get('/get-user-generations', async (req, res) => {
 });
 
 /**************************************************
- * Main background generation for FULL site
+ * Main background function for FULL site
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user) {
   try {
@@ -451,6 +450,7 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 
     progressMap[requestId].progress = 10;
 
+    // We'll ask GPT to include comment markers around each section:
     const snippetInspiration = `
 <html>
 <head>
@@ -479,41 +479,55 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 
     let systemPrompt;
     if (projectType.toLowerCase() === 'nft') {
-      // NFT logic
       systemPrompt = `
-You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
+You are GPT-4o. Generate ONE single-page HTML/CSS/JS site for an NFT project named "${coinName}" with color palette "${colorPalette}" and a ${themeSelection} theme. 
+The site must have these sections (commented like <!-- SECTION: nav --> ... <!-- END: nav -->, etc.):
 
-- It's an NFT site for "${coinName}" described as "${projectDesc}". 
-- Use color palette "${colorPalette}". 
-- The general page background must be a ${themeSelection} style (dark vs. light). 
-- Must contain placeholders NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. 
-- Snippet for partial inspiration (no code fences):
+1) <!-- SECTION: nav --> 
+2) <!-- SECTION: hero --> 
+3) <!-- SECTION: roadmap --> 
+4) <!-- SECTION: tokenomics --> 
+5) <!-- SECTION: exchanges --> 
+6) <!-- SECTION: about --> 
+7) <!-- SECTION: footer -->
+
+Use placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. 
+Use snippet below for partial inspiration, no leftover code fences:
 ${snippetInspiration}
+Description: ${projectDesc}
 `;
     } else {
-      // Token logic
       systemPrompt = `
-You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
+You are GPT-4o. Generate ONE single-page HTML/CSS/JS site for a memecoin token named "${coinName}" with color palette "${colorPalette}" and a ${themeSelection} theme. 
+The site must have these sections (commented like <!-- SECTION: nav --> ... <!-- END: nav -->, etc.):
 
-- It's a memecoin token site for "${coinName}" described as "${projectDesc}". 
-- Use color palette "${colorPalette}". 
-- The general page background must be a ${themeSelection} style (dark vs. light). 
-- Must contain placeholders NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. 
-- Snippet for partial inspiration (no code fences):
+1) <!-- SECTION: nav --> 
+2) <!-- SECTION: hero --> 
+3) <!-- SECTION: roadmap --> 
+4) <!-- SECTION: tokenomics --> 
+5) <!-- SECTION: exchanges --> 
+6) <!-- SECTION: about --> 
+7) <!-- SECTION: footer -->
+
+Use placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. 
+Use snippet below for partial inspiration, no leftover code fences:
 ${snippetInspiration}
+Description: ${projectDesc}
 `;
     }
 
     progressMap[requestId].progress = 20;
 
-    // GPT call
     const gptResponse = await openai.createChatCompletion({
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Generate one single HTML/CSS/JS file with those placeholders. Ensure it's visually appealing, modern, uses transitions, glassmorphism. No leftover code fences.`
+          content: `Generate the single HTML file with those 7 commented sections. 
+Ensure each is wrapped with <!-- SECTION: X --> ... <!-- END: X --> blocks. 
+No leftover code fences. 
+Make it visually appealing, modern, transitions, glassmorphism.`
         }
       ],
       max_tokens: 3500,
@@ -523,31 +537,26 @@ ${snippetInspiration}
     let siteCode = gptResponse.data.choices[0].message.content.trim();
     progressMap[requestId].progress = 40;
 
-    // Store images in memory
     const imagesObj = {};
 
-    // Prompts for images
-    let logoPrompt = "";
-    let heroPrompt = "";
-
+    // We'll generate images:
+    let logoPrompt, heroPrompt;
     if (projectType.toLowerCase() === 'nft') {
-      logoPrompt = `256x256 NFT style brand logo for "${coinName}", with color palette "${colorPalette}". Must look good on a ${themeSelection} background, no extra text. Transparent background.`;
-      heroPrompt = `1024x1024 NFT banner style background referencing "${coinName}" with color palette "${colorPalette}", suitable for ${themeSelection} theme. Subtle text or shape.`;
+      logoPrompt = `256x256 NFT style brand logo for "${coinName}", color palette "${colorPalette}". Transparent. Must look good on a ${themeSelection} background. No extra text.`;
+      heroPrompt = `1024x1024 NFT banner referencing "${coinName}", color palette "${colorPalette}", suitable for ${themeSelection} theme. Subtle text or shape.`;
     } else {
-      logoPrompt = `256x256 memecoin token logo for "${coinName}", color palette "${colorPalette}", must look good on a ${themeSelection} background. Transparent background. No text.`;
-      heroPrompt = `1024x1024 background referencing "${coinName}" in a memecoin style. color palette: "${colorPalette}", suitable for a ${themeSelection} theme. Subtle.`;
+      logoPrompt = `256x256 memecoin token logo for "${coinName}", color palette "${colorPalette}", must look good on a ${themeSelection} background. Transparent. No text.`;
+      heroPrompt = `1024x1024 background referencing "${coinName}" in a memecoin style, color palette "${colorPalette}", for a ${themeSelection} theme. Subtle.`;
     }
 
-    // Generate nav/footer logo (256x256)
+    // nav/footer
     try {
       progressMap[requestId].progress = 45;
       const logoResp = await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256" });
       const logoUrl = logoResp.data.data[0].url;
-      const logoFetch = await fetch(logoUrl);
-      const logoBuffer = await logoFetch.arrayBuffer();
-      const base64Logo = "data:image/png;base64," + Buffer.from(logoBuffer).toString("base64");
-      imagesObj.navLogo = base64Logo; 
-      imagesObj.footerImg = base64Logo; 
+      const logoBuf = await (await fetch(logoUrl)).arrayBuffer();
+      imagesObj.navLogo = "data:image/png;base64," + Buffer.from(logoBuf).toString("base64");
+      imagesObj.footerImg = imagesObj.navLogo;
     } catch (err) {
       console.error("Nav/Footer logo error:", err);
       const fallback = "data:image/png;base64,iVBORw0K...";
@@ -555,20 +564,18 @@ ${snippetInspiration}
       imagesObj.footerImg = fallback;
     }
 
-    // Generate hero bg (1024x1024)
+    // hero
     try {
       progressMap[requestId].progress = 55;
       const bgResp = await openai.createImage({ prompt: heroPrompt, n:1, size:"1024x1024" });
       const bgUrl = bgResp.data.data[0].url;
-      const bgFetch = await fetch(bgUrl);
-      const bgBuffer = await bgFetch.arrayBuffer();
-      imagesObj.heroBg = "data:image/png;base64," + Buffer.from(bgBuffer).toString("base64");
+      const bgBuf = await (await fetch(bgUrl)).arrayBuffer();
+      imagesObj.heroBg = "data:image/png;base64," + Buffer.from(bgBuf).toString("base64");
     } catch (err) {
       console.error("Hero BG error:", err);
       imagesObj.heroBg = "data:image/png;base64,iVBORw0K...";
     }
 
-    // Remove leftover code fences
     siteCode = siteCode.replace(/```+/g, "");
 
     progressMap[requestId].progress = 60;
@@ -593,48 +600,44 @@ ${snippetInspiration}
 }
 
 /**************************************************
- * NEW: POST /generate-section (for partial snippet)
- * Deduct 0.25 credits, generate a snippet for a
- * specific "section," return snippet + images.
+ * POST /generate-section => Refresh single section
+ * Deduct 0.25 credits, parse out only that snippet
  **************************************************/
 app.post('/generate-section', async (req, res) => {
-  try {
-    const { walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc } = req.body;
-    if (!walletAddress || !section) {
-      return res.status(400).json({ error: "Missing walletAddress or section field." });
-    }
+  const { walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc } = req.body;
+  if (!walletAddress || !section) {
+    return res.status(400).json({ error: "Missing walletAddress or section." });
+  }
 
-    // Check user & credits
+  try {
     const user = await User.findOne({ walletAddress });
     if (!user) {
       return res.status(400).json({ error: "Invalid wallet address." });
     }
-
-    // Must have at least 0.25 credits
+    // Need 0.25
     if (user.credits < 0.25) {
-      return res.status(400).json({ error: "Insufficient credits for partial regeneration (need 0.25 credits)." });
+      return res.status(400).json({ error: "Insufficient credits for a section refresh (need 0.25)." });
     }
-
     // Deduct 0.25
     user.credits -= 0.25;
     await user.save();
 
-    // Decide system prompt for this section
-    const systemPrompt = getSystemPromptForSection(section, {
-      coinName, colorPalette, projectType, themeSelection, projectDesc
-    });
-
-    // GPT call for snippet
+    // GPT system prompt for just one section
+    const systemPrompt = `
+You are GPT-4o. Generate ONLY the HTML/CSS/JS snippet for the [${section}] section of a ${projectType} site named "${coinName}". 
+Use color palette "${colorPalette}" and a ${themeSelection} theme. 
+Wrap it with <!-- SECTION: ${section} --> ... <!-- END: ${section} --> comments so we can find it. 
+Use placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER. 
+Project desc: ${projectDesc}
+No leftover code fences. 
+`;
     const gptResp = await openai.createChatCompletion({
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Generate ONLY the HTML/CSS/JS snippet for this [${section}] section. 
-No <html> or <head> or <body> tags, just the code for that section. 
-Include a placeholder like ${section.toUpperCase()}_IMAGE_PLACEHOLDER if needed. 
-No leftover code fences.`
+          content: `Generate ONLY that section snippet (including the <!-- SECTION: ${section} --> comment). No <html> or <body> tags.`
         }
       ],
       max_tokens: 1200,
@@ -644,23 +647,22 @@ No leftover code fences.`
     let snippet = gptResp.data.choices[0].message.content.trim();
     snippet = snippet.replace(/```+/g, "");
 
-    // Optionally generate images if this section typically needs one
-    const imagesObj = {};
-
+    // Optionally generate an image if relevant
+    let imagesObj = {};
     if (section.toLowerCase() === 'nav') {
-      // Example: generate 256x256 logo
+      // Example 256x256
       try {
-        const logoPrompt = `256x256 logo for ${coinName}, color palette: ${colorPalette}, for a ${themeSelection} style. Transparent.`;
-        const logoResp = await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256" });
-        const logoUrl = logoResp.data.data[0].url;
-        const logoBuf = await (await fetch(logoUrl)).arrayBuffer();
-        imagesObj.sectionImage = "data:image/png;base64," + Buffer.from(logoBuf).toString("base64");
+        const navPrompt = `256x256 logo for ${coinName}, color palette ${colorPalette}, for a ${themeSelection} theme. Transparent.`;
+        const navResp = await openai.createImage({ prompt: navPrompt, n:1, size:"256x256" });
+        const navUrl = navResp.data.data[0].url;
+        const navBuf = await (await fetch(navUrl)).arrayBuffer();
+        imagesObj.sectionImage = "data:image/png;base64," + Buffer.from(navBuf).toString("base64");
       } catch (err) {
-        console.error("Nav section image error:", err);
+        console.error("Nav refresh image error:", err);
       }
-    }
+    } 
     else if (section.toLowerCase() === 'hero') {
-      // Example: generate 1024x1024 hero
+      // Example 1024x1024
       try {
         const heroPrompt = `1024x1024 hero banner referencing ${coinName}, color: ${colorPalette}, theme: ${themeSelection}. Transparent areas if possible.`;
         const heroResp = await openai.createImage({ prompt: heroPrompt, n:1, size:"1024x1024" });
@@ -668,34 +670,17 @@ No leftover code fences.`
         const heroBuf = await (await fetch(heroUrl)).arrayBuffer();
         imagesObj.sectionImage = "data:image/png;base64," + Buffer.from(heroBuf).toString("base64");
       } catch (err) {
-        console.error("Hero section image error:", err);
+        console.error("Hero refresh image error:", err);
       }
     }
-    // ... repeat logic for other sections if you want
+    // etc. for other sections if you want
 
-    // Return snippet + images + updated credits
-    return res.json({
-      snippet,
-      images: imagesObj,
-      newCredits: user.credits
-    });
+    return res.json({ snippet, images: imagesObj, newCredits: user.credits });
   } catch (err) {
     console.error("Error in /generate-section:", err);
     return res.status(500).json({ error: "Internal server error." });
   }
 });
-
-/** Helper to build a system prompt for the given section. */
-function getSystemPromptForSection(section, { coinName, colorPalette, projectType, themeSelection, projectDesc }) {
-  return `
-You are GPT-4. Generate a snippet for the [${section}] section of a ${projectType} site named "${coinName}" (desc: "${projectDesc}").
-Use color palette "${colorPalette}" and a ${themeSelection} theme. 
-Be visually appealing with modern transitions. 
-Use advanced CSS if needed. 
-Insert placeholders if images are needed (like ${section.toUpperCase()}_IMAGE_PLACEHOLDER). 
-No full HTML <head> or <body>, just the snippet for this section.
-`;
-}
 
 /**************************************************
  * Error Handling
