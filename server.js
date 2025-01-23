@@ -87,11 +87,16 @@ app.post('/start-generation', async (req, res) => {
     return res.status(400).json({ error: "walletAddress and userInputs are required." });
   }
 
-  const { coinName, colorPalette, themeSelection, projectDesc } = userInputs;
+  const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs;
 
-  // Validate that themeSelection is either "token" or "nft"
-  if (!themeSelection || !['token', 'nft'].includes(themeSelection.toLowerCase())) {
-    return res.status(400).json({ error: "themeSelection must be either 'token' or 'nft'." });
+  // Validate projectType
+  if (!projectType || !['nft','token'].includes(projectType.toLowerCase())) {
+    return res.status(400).json({ error: "projectType must be either 'nft' or 'token'." });
+  }
+
+  // Validate themeSelection
+  if (!themeSelection || !['dark','light'].includes(themeSelection.toLowerCase())) {
+    return res.status(400).json({ error: "themeSelection must be either 'dark' or 'light'." });
   }
 
   try {
@@ -111,7 +116,7 @@ app.post('/start-generation', async (req, res) => {
       status: 'in-progress',
       progress: 0,
       code: null,
-      images: {} // will store base64 images here
+      images: {}
     };
 
     // Start background generation
@@ -120,7 +125,7 @@ app.post('/start-generation', async (req, res) => {
       progressMap[requestId].status = 'error';
       progressMap[requestId].progress = 100;
 
-      // Refund credit if there's an error
+      // Refund credit on error
       User.findOneAndUpdate({ walletAddress }, { $inc: { credits: 1 } })
         .then(() => {
           console.log(`Refunded 1 credit to ${walletAddress} due to generation failure.`);
@@ -151,7 +156,6 @@ app.get('/progress', (req, res) => {
 
 /**************************************************
  * GET /result?requestId=XYZ
- * Returns final HTML, with placeholders replaced by in-memory images
  **************************************************/
 app.get('/result', (req, res) => {
   const { requestId } = req.query;
@@ -164,7 +168,7 @@ app.get('/result', (req, res) => {
     return res.status(400).json({ error: "Not finished or generation error." });
   }
 
-  // On-the-fly replace placeholders with base64 from in-memory
+  // Replace placeholders with base64 from in-memory
   let finalCode = code;
   if (images.navLogo) {
     finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
@@ -181,7 +185,6 @@ app.get('/result', (req, res) => {
 
 /**************************************************
  * GET /export?requestId=XYZ&type=full|wordpress
- * Replaces placeholders with in-memory images, then returns
  **************************************************/
 app.get('/export', (req, res) => {
   const { requestId, type } = req.query;
@@ -198,7 +201,7 @@ app.get('/export', (req, res) => {
     return res.status(400).json({ error: "Invalid or missing export type. Use 'full' or 'wordpress'." });
   }
 
-  // Replace placeholders with in-memory images
+  // Replace placeholders
   let finalCode = code;
   if (images.navLogo) {
     finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
@@ -399,7 +402,6 @@ app.get('/get-user-generations', async (req, res) => {
   console.log("→ /get-user-generations => walletAddress:", walletAddress);
 
   try {
-    // .lean() => faster
     const user = await User.findOne({ walletAddress }).lean();
     console.log("   Found user =>", user ? user._id : "None");
 
@@ -427,8 +429,8 @@ app.get('/get-user-generations', async (req, res) => {
       if (i > 0) {
         res.write(',');
       }
-
       res.write(JSON.stringify(fileObj));
+      // flush
       await new Promise(resolve => setImmediate(resolve));
     }
 
@@ -441,20 +443,17 @@ app.get('/get-user-generations', async (req, res) => {
 });
 
 /**************************************************
- * The main background generation function
+ * Main background generation function
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user) {
   try {
-    const { coinName, colorPalette, themeSelection, projectDesc } = userInputs || {};
-    if (!coinName || !colorPalette || !themeSelection) {
-      throw new Error("Missing 'coinName', 'colorPalette', or 'themeSelection'.");
-    }
+    const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs || {};
 
     progressMap[requestId].progress = 10;
 
-    // We'll store GPT messages for both "token" and "nft" logic.
-
-    // 1) Example snippet for partial inspiration
+    /*********************************************
+     * Shared snippet for partial inspiration
+     *********************************************/
     const snippetInspiration = `
 <html>
 <head>
@@ -481,55 +480,46 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 </html>
 `;
 
-    // 2) System prompt for a TOKEN site (the old logic)
-    const tokenSystemPrompt = `
+    /*********************************************
+     * Decide which system prompt to use
+     *********************************************/
+    let systemPrompt;
+    if (projectType.toLowerCase() === 'nft') {
+      // NFT logic
+      systemPrompt = `
 You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
 
-- Use a gradient of "${colorPalette}" for an engaging color scheme, implementing advanced glassmorphism, transitions, etc.
-- Focus on a new memecoin token named "${coinName}" with project description "${projectDesc}".
-- The site must include these placeholders for images:
-  - NAV_IMAGE_PLACEHOLDER (256x256 token logo)
-  - HERO_BG_PLACEHOLDER (1024x1024 hero background)
-  - FOOTER_IMAGE_PLACEHOLDER (256x256, same as NAV_IMAGE_PLACEHOLDER)
-- Must be fully responsive, advanced transitions, shimmer, glass, etc.
-- Use snippet below for partial inspiration (no code fences):
+- It's an NFT site for "${coinName}" described as "${projectDesc}". 
+- Use color palette "${colorPalette}". 
+- The general page background must be a ${themeSelection} style (dark vs. light). 
+- Must contain placeholders NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. 
+- Snippet for partial inspiration (no code fences):
 ${snippetInspiration}
 `;
-
-    // 3) System prompt for an NFT site (the NEW logic)
-    const nftSystemPrompt = `
-You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
-
-- Use a gradient of "${colorPalette}" for an engaging color scheme, with advanced glassmorphism and transitions.
-- Focus on an NFT collection called "${coinName}" with the description "${projectDesc}".
-- The site must emphasize collectible artwork, NFT rarity, and a mint section (dummy button) for examples.
-- Must be fully responsive, advanced transitions, shimmer, glass, etc.
-- Include these placeholders for images:
-  - NAV_IMAGE_PLACEHOLDER (256x256 NFT brand logo)
-  - HERO_BG_PLACEHOLDER (1024x1024 hero background or NFT banner)
-  - FOOTER_IMAGE_PLACEHOLDER (same as NAV_IMAGE_PLACEHOLDER)
-- Use snippet below for partial inspiration (no code fences):
-${snippetInspiration}
-`;
-
-    // Decide which system prompt to use based on themeSelection
-    let systemMessage = null;
-    if (themeSelection.toLowerCase() === 'token') {
-      systemMessage = tokenSystemPrompt;
     } else {
-      systemMessage = nftSystemPrompt;
+      // Token logic
+      systemPrompt = `
+You are GPT-4o, an advanced website-building AI. Create a single-page HTML/CSS/JS site:
+
+- It's a memecoin token site for "${coinName}" described as "${projectDesc}". 
+- Use color palette "${colorPalette}". 
+- The general page background must be a ${themeSelection} style (dark vs. light). 
+- Must contain placeholders NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. 
+- Snippet for partial inspiration (no code fences):
+${snippetInspiration}
+`;
     }
 
     progressMap[requestId].progress = 20;
 
-    // 1) ChatCompletion => generate site code with placeholders
+    // GPT call
     const gptResponse = await openai.createChatCompletion({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: systemMessage },
+        { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Generate the single-file site now with placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER. No leftover code fences. Keep it extremely modern and visually stunning.`
+          content: `Generate one single HTML/CSS/JS file with those placeholders. Ensure it's visually appealing, modern, uses transitions, glassmorphism. No leftover code fences.`
         }
       ],
       max_tokens: 3500,
@@ -539,30 +529,25 @@ ${snippetInspiration}
     let siteCode = gptResponse.data.choices[0].message.content.trim();
     progressMap[requestId].progress = 40;
 
-    // We'll store images in memory only (so DB doesn't bloat)
+    // Store images in memory
     const imagesObj = {};
 
-    /***************************************************
-     * Generate images differently for Token vs NFT
-     **************************************************/
-    // Logo prompt
-    let logoPrompt;
-    let heroPrompt;
+    /*********************************************
+     * Image generation
+     *********************************************/
+    // For NFT vs. Token, also factor in "themeSelection" for the background color
+    let logoPrompt = "";
+    let heroPrompt = "";
 
-    if (themeSelection.toLowerCase() === 'token') {
-      logoPrompt = `256x256 transparent token logo for a memecoin called "${coinName}". 
-color palette: "${colorPalette}". 
-No extra text or background. Fun, playful, circular design.`;
-      heroPrompt = `1024x1024 futuristic token-themed background with gradient of "${colorPalette}". Subtle reference to "${coinName}" and "${projectDesc}".`;
+    if (projectType.toLowerCase() === 'nft') {
+      logoPrompt = `256x256 NFT style brand logo for "${coinName}", with color palette "${colorPalette}". Must look good on a ${themeSelection} background, no extra text. Transparent background.`;
+      heroPrompt = `1024x1024 NFT banner style background referencing "${coinName}" with color palette "${colorPalette}", suitable for ${themeSelection} theme. Subtle text or shape.`;
     } else {
-      // NFT
-      logoPrompt = `256x256 unique NFT collection logo for "${coinName}". 
-color palette: "${colorPalette}". 
-No extra text or background. Vibrant, collectible style.`;
-      heroPrompt = `1024x1024 NFT banner background with gradient of "${colorPalette}". Some subtle referencing to "${coinName}" and NFT aesthetics.`;
+      logoPrompt = `256x256 memecoin token logo for "${coinName}", color palette "${colorPalette}", must look good on a ${themeSelection} background. Transparent background. No text.`;
+      heroPrompt = `1024x1024 background referencing "${coinName}" in a memecoin style. color palette: "${colorPalette}", suitable for a ${themeSelection} theme. Subtle.`;
     }
 
-    // Generate 256x256 logo
+    // Generate nav/footer logo (256x256)
     try {
       progressMap[requestId].progress = 45;
       const logoResp = await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256" });
@@ -570,8 +555,8 @@ No extra text or background. Vibrant, collectible style.`;
       const logoFetch = await fetch(logoUrl);
       const logoBuffer = await logoFetch.arrayBuffer();
       const base64Logo = "data:image/png;base64," + Buffer.from(logoBuffer).toString("base64");
-      imagesObj.navLogo = base64Logo;      // for NAV_IMAGE_PLACEHOLDER
-      imagesObj.footerImg = base64Logo;    // for FOOTER_IMAGE_PLACEHOLDER
+      imagesObj.navLogo = base64Logo; 
+      imagesObj.footerImg = base64Logo; 
     } catch (err) {
       console.error("Nav/Footer logo error:", err);
       // fallback
@@ -580,7 +565,7 @@ No extra text or background. Vibrant, collectible style.`;
       imagesObj.footerImg = fallback;
     }
 
-    // Generate 1024x1024 hero background
+    // Generate hero bg (1024x1024)
     try {
       progressMap[requestId].progress = 55;
       const bgResp = await openai.createImage({ prompt: heroPrompt, n:1, size:"1024x1024" });
@@ -593,12 +578,10 @@ No extra text or background. Vibrant, collectible style.`;
       imagesObj.heroBg = "data:image/png;base64,iVBORw0K...";
     }
 
-    progressMap[requestId].progress = 60;
-
     // Remove leftover code fences
     siteCode = siteCode.replace(/```+/g, "");
 
-    // We do NOT replace placeholders in the DB-stored code
+    progressMap[requestId].progress = 60;
     progressMap[requestId].code = siteCode;
     progressMap[requestId].images = imagesObj;
     progressMap[requestId].status = "done";
@@ -607,7 +590,7 @@ No extra text or background. Vibrant, collectible style.`;
     // Save placeholder version to DB
     user.generatedFiles.push({
       requestId,
-      content: siteCode,  // placeholders remain in DB
+      content: siteCode,
       generatedAt: new Date()
     });
     await user.save();
