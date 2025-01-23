@@ -9,7 +9,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
 const { createWallet } = require('./wasm_rpc');
-const User = require('./models/User'); 
+const User = require('./models/User');
 // Only fetchAndProcessUserDeposits, no initDepositSchedulers
 const { fetchAndProcessUserDeposits } = require('./services/depositService');
 
@@ -429,7 +429,6 @@ app.get('/get-user-generations', async (req, res) => {
         res.write(',');
       }
       res.write(JSON.stringify(fileObj));
-      // flush
       await new Promise(resolve => setImmediate(resolve));
     }
 
@@ -442,7 +441,7 @@ app.get('/get-user-generations', async (req, res) => {
 });
 
 /**************************************************
- * Main background function for FULL site
+ * The main background function for FULL site
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user) {
   try {
@@ -450,7 +449,7 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 
     progressMap[requestId].progress = 10;
 
-    // We'll ask GPT to include comment markers around each section:
+    // We'll ask GPT to include comment markers for each major section:
     const snippetInspiration = `
 <html>
 <head>
@@ -629,7 +628,7 @@ Use color palette "${colorPalette}" and a ${themeSelection} theme.
 Wrap it with <!-- SECTION: ${section} --> ... <!-- END: ${section} --> comments so we can find it. 
 Use placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER. 
 Project desc: ${projectDesc}
-No leftover code fences. 
+No leftover code fences.
 `;
     const gptResp = await openai.createChatCompletion({
       model: "gpt-4o",
@@ -660,7 +659,7 @@ No leftover code fences.
       } catch (err) {
         console.error("Nav refresh image error:", err);
       }
-    } 
+    }
     else if (section.toLowerCase() === 'hero') {
       // Example 1024x1024
       try {
