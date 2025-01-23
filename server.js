@@ -469,7 +469,7 @@ No leftover code fences.
     progressMap[requestId].progress=20;
 
     const gptResponse= await openai.createChatCompletion({
-      model:"gpt-4",
+      model:"gpt-4o",
       messages:[
         {role:"system", content:systemPrompt},
         {
