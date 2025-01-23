@@ -9,7 +9,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
 const { createWallet } = require('./wasm_rpc');
-const User = require('./models/User');
+const User = require('./models/User'); 
 // Only fetchAndProcessUserDeposits, no initDepositSchedulers
 const { fetchAndProcessUserDeposits } = require('./services/depositService');
 
@@ -58,7 +58,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 /**************************************************
- * In-Memory Progress & Results (for full gen)
+ * In-Memory Progress & Results
  **************************************************/
 const progressMap = {};
 
@@ -79,7 +79,7 @@ app.get('/', (req, res) => {
 });
 
 /**************************************************
- * POST /start-generation (full site, costs 1 credit)
+ * POST /start-generation (full site, 1 credit)
  **************************************************/
 app.post('/start-generation', async (req, res) => {
   const { walletAddress, userInputs } = req.body;
@@ -88,15 +88,11 @@ app.post('/start-generation', async (req, res) => {
   }
 
   const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs;
-
-  // Validate projectType
   if (!projectType || !['nft','token'].includes(projectType.toLowerCase())) {
-    return res.status(400).json({ error: "projectType must be either 'nft' or 'token'." });
+    return res.status(400).json({ error: "projectType must be 'nft' or 'token'." });
   }
-
-  // Validate themeSelection
   if (!themeSelection || !['dark','light'].includes(themeSelection.toLowerCase())) {
-    return res.status(400).json({ error: "themeSelection must be either 'dark' or 'light'." });
+    return res.status(400).json({ error: "themeSelection must be 'dark' or 'light'." });
   }
 
   try {
@@ -106,115 +102,97 @@ app.post('/start-generation', async (req, res) => {
       { $inc: { credits: -1 } },
       { new: true }
     );
-
-    if (!user) {
-      return res.status(400).json({ error: "Insufficient credits or invalid wallet address." });
+    if(!user){
+      return res.status(400).json({ error:"Insufficient credits or invalid wallet address."});
     }
 
-    const requestId = generateRequestId();
-    // Store minimal data
-    progressMap[requestId] = {
-      status: 'in-progress',
-      progress: 0,
-      code: null,
-      images: {}
+    const requestId= generateRequestId();
+    progressMap[requestId]={
+      status:'in-progress',
+      progress:0,
+      code:null,
+      images:{}
     };
 
-    // Start background generation
-    doWebsiteGeneration(requestId, userInputs, user).catch(err => {
+    doWebsiteGeneration(requestId, userInputs, user).catch(err=>{
       console.error("Background generation error:", err);
-      progressMap[requestId].status = 'error';
-      progressMap[requestId].progress = 100;
-
-      // Refund credit on error
-      User.findOneAndUpdate({ walletAddress }, { $inc: { credits: 1 } })
-        .then(() => {
-          console.log(`Refunded 1 credit to ${walletAddress} due to generation failure.`);
-        })
-        .catch(refundErr => {
-          console.error(`Failed to refund credit for user ${walletAddress}:`, refundErr);
-        });
+      progressMap[requestId].status='error';
+      progressMap[requestId].progress=100;
+      // Refund
+      User.findOneAndUpdate({walletAddress},{ $inc:{ credits:1 } })
+      .catch(refundErr=> console.error("Failed to refund credit:", refundErr));
     });
 
     return res.json({ requestId });
-  } catch (err) {
+  } catch(err){
     console.error("Error starting generation:", err);
-    return res.status(500).json({ error: "Internal server error." });
+    return res.status(500).json({ error:"Internal server error."});
   }
 });
 
 /**************************************************
  * GET /progress?requestId=XYZ
  **************************************************/
-app.get('/progress', (req, res) => {
-  const { requestId } = req.query;
-  if (!requestId || !progressMap[requestId]) {
-    return res.status(400).json({ error: "Invalid or missing requestId" });
+app.get('/progress',(req,res)=>{
+  const {requestId}=req.query;
+  if(!requestId||!progressMap[requestId]){
+    return res.status(400).json({error:"Invalid or missing requestId"});
   }
-
-  const { status, progress } = progressMap[requestId];
-  return res.json({ status, progress });
+  const {status,progress}= progressMap[requestId];
+  return res.json({status,progress});
 });
 
 /**************************************************
  * GET /result?requestId=XYZ
  **************************************************/
-app.get('/result', (req, res) => {
-  const { requestId } = req.query;
-  if (!requestId || !progressMap[requestId]) {
-    return res.status(400).json({ error: "Invalid or missing requestId" });
+app.get('/result',(req,res)=>{
+  const {requestId}= req.query;
+  if(!requestId||!progressMap[requestId]){
+    return res.status(400).json({error:"Invalid or missing requestId"});
   }
-
-  const { status, code, images } = progressMap[requestId];
-  if (status !== 'done') {
-    return res.status(400).json({ error: "Not finished or generation error." });
+  const {status, code, images}= progressMap[requestId];
+  if(status!=='done'){
+    return res.status(400).json({error:"Not finished or generation error."});
   }
-
-  // Insert images
-  let finalCode = code;
-  if (images.navLogo) {
-    finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
+  let finalCode= code;
+  if(images.navLogo){
+    finalCode= finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
   }
-  if (images.heroBg) {
-    finalCode = finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
+  if(images.heroBg){
+    finalCode= finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
   }
-  if (images.footerImg) {
-    finalCode = finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
+  if(images.footerImg){
+    finalCode= finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
   }
-
-  return res.json({ code: finalCode });
+  return res.json({ code: finalCode});
 });
 
 /**************************************************
  * GET /export?requestId=XYZ&type=full|wordpress
  **************************************************/
-app.get('/export', (req, res) => {
-  const { requestId, type } = req.query;
-  if (!requestId || !progressMap[requestId]) {
-    return res.status(400).json({ error: "Invalid or missing requestId" });
+app.get('/export',(req,res)=>{
+  const {requestId, type}=req.query;
+  if(!requestId||!progressMap[requestId]){
+    return res.status(400).json({error:"Invalid or missing requestId"});
   }
-
-  const { status, code, images } = progressMap[requestId];
-  if (status !== 'done') {
-    return res.status(400).json({ error: "Generation not completed or encountered an error." });
+  const {status,code,images}= progressMap[requestId];
+  if(status!=='done'){
+    return res.status(400).json({error:"Generation not completed or encountered an error."});
   }
-
-  if (!type || !['full','wordpress'].includes(type)) {
-    return res.status(400).json({ error: "Invalid or missing export type. Use 'full' or 'wordpress'." });
+  if(!type||!['full','wordpress'].includes(type)){
+    return res.status(400).json({error:"Invalid or missing export type. Use 'full' or 'wordpress'."});
   }
-
-  let finalCode = code;
-  if (images.navLogo) {
-    finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
+  let finalCode= code;
+  if(images.navLogo){
+    finalCode= finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
   }
-  if (images.heroBg) {
-    finalCode = finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
+  if(images.heroBg){
+    finalCode= finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
   }
-  if (images.footerImg) {
-    finalCode = finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
+  if(images.footerImg){
+    finalCode= finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
   }
-
-  const filename = sanitizeFilename(requestId);
+  const filename= sanitizeFilename(requestId);
   if(type==='full'){
     res.setHeader('Content-Type','text/html');
     res.setHeader('Content-Disposition',`attachment; filename="${filename}_website.html"`);
@@ -241,13 +219,13 @@ ${finalCode}
 /**************************************************
  * GET /get-credits?walletAddress=XYZ
  **************************************************/
-app.get('/get-credits', async (req, res) => {
-  const { walletAddress } = req.query;
+app.get('/get-credits', async(req,res)=>{
+  const {walletAddress}=req.query;
   if(!walletAddress){
     return res.status(400).json({success:false,error:"walletAddress is required."});
   }
   try{
-    const user=await User.findOne({walletAddress});
+    const user= await User.findOne({walletAddress});
     if(!user){
       return res.status(400).json({success:false,error:"Invalid wallet address."});
     }
@@ -262,26 +240,26 @@ app.get('/get-credits', async (req, res) => {
  * POST /create-wallet
  **************************************************/
 app.post('/create-wallet', async(req,res)=>{
-  const {username,password}= req.body;
+  const {username,password}=req.body;
   if(!username||!password){
     return res.status(400).json({success:false,error:"Username and password are required."});
   }
   try{
-    const existing=await User.findOne({username});
-    if(existing){
+    const existingUser= await User.findOne({username});
+    if(existingUser){
       return res.status(400).json({success:false,error:"Username already exists. Please choose another one."});
     }
-    const walletData=await createWallet();
+    const walletData= await createWallet();
     if(!walletData.success){
       return res.status(500).json({success:false,error:"Wallet creation failed."});
     }
-    const {receivingAddress,xPrv,mnemonic}=walletData;
+    const {receivingAddress,xPrv,mnemonic}= walletData;
     const saltRounds=10;
-    const passwordHash=await bcrypt.hash(password,saltRounds);
+    const passwordHash= await bcrypt.hash(password,saltRounds);
 
     const newUser=new User({
       username,
-      walletAddress: receivingAddress,
+      walletAddress:receivingAddress,
       passwordHash,
       xPrv,
       mnemonic,
@@ -289,12 +267,12 @@ app.post('/create-wallet', async(req,res)=>{
       generatedFiles:[]
     });
     await newUser.save();
-    return res.json({success:true, walletAddress: receivingAddress});
+    return res.json({success:true, walletAddress:receivingAddress});
   }catch(err){
-    console.error("Error creating wallet:",err);
-    if (err.code===11000 && err.keyPattern && err.keyPattern.username){
+    if(err.code===11000 && err.keyPattern && err.keyPattern.username){
       return res.status(400).json({success:false,error:"Username already exists. Please choose another one."});
     }
+    console.error("Error creating wallet:",err);
     return res.status(500).json({success:false,error:"Internal server error."});
   }
 });
@@ -303,17 +281,17 @@ app.post('/create-wallet', async(req,res)=>{
  * POST /connect-wallet
  **************************************************/
 app.post('/connect-wallet', async(req,res)=>{
-  const {walletAddress,password}=req.body;
+  const {walletAddress,password}= req.body;
   if(!walletAddress||!password){
     return res.status(400).json({success:false,error:"Wallet address and password are required."});
   }
   try{
-    const user=await User.findOne({walletAddress});
+    const user= await User.findOne({walletAddress});
     if(!user){
       return res.status(400).json({success:false,error:"Invalid wallet address or password."});
     }
-    const match=await bcrypt.compare(password,user.passwordHash);
-    if(!match){
+    const passwordMatch= await bcrypt.compare(password,user.passwordHash);
+    if(!passwordMatch){
       return res.status(400).json({success:false,error:"Invalid wallet address or password."});
     }
     return res.json({
@@ -332,8 +310,8 @@ app.post('/connect-wallet', async(req,res)=>{
 /**************************************************
  * POST /scan-deposits
  **************************************************/
-app.post('/scan-deposits',async(req,res)=>{
-  const {walletAddress}=req.body;
+app.post('/scan-deposits', async(req,res)=>{
+  const {walletAddress}= req.body;
   if(!walletAddress){
     return res.status(400).json({success:false,error:"Missing walletAddress"});
   }
@@ -359,7 +337,7 @@ app.post('/save-generated-file',async(req,res)=>{
     return res.status(400).json({success:false,error:"All fields are required."});
   }
   try{
-    const user=await User.findOne({walletAddress});
+    const user= await User.findOne({walletAddress});
     if(!user){
       return res.status(400).json({success:false,error:"Invalid wallet address."});
     }
@@ -379,13 +357,13 @@ app.post('/save-generated-file',async(req,res)=>{
 /**************************************************
  * GET /get-user-generations?walletAddress=XYZ
  **************************************************/
-app.get('/get-user-generations',async(req,res)=>{
-  const {walletAddress}=req.query;
+app.get('/get-user-generations', async(req,res)=>{
+  const {walletAddress}= req.query;
   if(!walletAddress){
     return res.status(400).json({success:false,error:"Missing walletAddress."});
   }
   try{
-    const user=await User.findOne({walletAddress}).lean();
+    const user= await User.findOne({walletAddress}).lean();
     if(!user){
       return res.status(404).json({success:false,error:"User not found."});
     }
@@ -397,7 +375,11 @@ app.get('/get-user-generations',async(req,res)=>{
     res.write('{"success":true,"generatedFiles":[');
     for(let i=0;i<files.length;i++){
       if(i>0)res.write(',');
-      res.write(JSON.stringify(files[i]));
+      res.write(JSON.stringify({
+        requestId:files[i].requestId,
+        content:files[i].content,
+        generatedAt:files[i].generatedAt
+      }));
       await new Promise(resolve=>setImmediate(resolve));
     }
     res.write(']}');
@@ -409,11 +391,12 @@ app.get('/get-user-generations',async(req,res)=>{
 });
 
 /**************************************************
- * The main background generation for FULL site
+ * MAIN background generation function
+ * Increased max_tokens => 4000 for bigger GPT responses
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user){
   try{
-    const {coinName,colorPalette,projectType,themeSelection,projectDesc}= userInputs||{};
+    const { coinName, colorPalette, projectType, themeSelection, projectDesc}= userInputs||{};
     progressMap[requestId].progress=10;
 
     const snippetInspiration=`
@@ -422,16 +405,16 @@ async function doWebsiteGeneration(requestId, userInputs, user){
   <style>
     /* Example gradient & shimmer */
     body {
-      margin:0; padding:0;
-      font-family:sans-serif;
+      margin: 0; padding: 0;
+      font-family: sans-serif;
     }
     .shimmer-bg {
       background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.1) 100%);
       background-size: 200% 200%;
       animation: shimmerMove 2s infinite;
     }
-    @keyframes shimmerMove{
-      0%{ background-position:-200% 0;}
+    @keyframes shimmerMove {
+      0% { background-position:-200% 0;}
       100%{ background-position:200% 0;}
     }
   </style>
@@ -445,80 +428,96 @@ async function doWebsiteGeneration(requestId, userInputs, user){
     let systemPrompt;
     if(projectType.toLowerCase()==='nft'){
       systemPrompt=`
-You are GPT-4. Generate a single-page HTML/CSS/JS site for an NFT project named "${coinName}",
-color palette "${colorPalette}", with a ${themeSelection} theme.
-The site must have 7 sections (nav, hero, roadmap, tokenomics, exchanges, about, footer),
-each wrapped in <!-- SECTION: X -->...<!-- END: X -->.
-Use placeholders NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER.
-Snippet for partial inspiration:
+You are GPT-4. Generate a single-page HTML/CSS/JS site for an NFT project named "${coinName}", 
+with color palette "${colorPalette}" and a ${themeSelection} theme.
+It MUST have 7 sections: 
+1) <!-- SECTION: nav -->
+2) <!-- SECTION: hero -->
+3) <!-- SECTION: roadmap -->
+4) <!-- SECTION: tokenomics -->
+5) <!-- SECTION: exchanges -->
+6) <!-- SECTION: about -->
+7) <!-- SECTION: footer -->
+
+Use placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER.
+Use snippet for partial inspiration:
 ${snippetInspiration}
 ProjectDesc: ${projectDesc}
 No leftover code fences.
 `;
     } else {
       systemPrompt=`
-You are GPT-4. Generate a single-page HTML/CSS/JS site for a memecoin token named "${coinName}",
-color palette "${colorPalette}", with a ${themeSelection} theme.
-The site must have 7 sections (nav, hero, roadmap, tokenomics, exchanges, about, footer),
-each wrapped in <!-- SECTION: X -->...<!-- END: X -->.
-Use placeholders NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER.
-Snippet for partial inspiration:
+You are GPT-4. Generate a single-page HTML/CSS/JS site for a memecoin token named "${coinName}", 
+with color palette "${colorPalette}" and a ${themeSelection} theme.
+It MUST have 7 sections: 
+1) <!-- SECTION: nav -->
+2) <!-- SECTION: hero -->
+3) <!-- SECTION: roadmap -->
+4) <!-- SECTION: tokenomics -->
+5) <!-- SECTION: exchanges -->
+6) <!-- SECTION: about -->
+7) <!-- SECTION: footer -->
+
+Use placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER.
+Use snippet for partial inspiration:
 ${snippetInspiration}
 ProjectDesc: ${projectDesc}
 No leftover code fences.
 `;
     }
+
     progressMap[requestId].progress=20;
 
-    const gptResponse=await openai.createChatCompletion({
+    const gptResponse= await openai.createChatCompletion({
       model:"gpt-4",
       messages:[
-        {role:"system",content:systemPrompt},
-        {role:"user",content:`Generate the single HTML file with 7 sections each wrapped in comment markers. Make it visually appealing, transitions, glassmorphism, no leftover code fences.`}
+        {role:"system", content:systemPrompt},
+        {
+          role:"user",
+          content:`Generate the single HTML file with EXACT comment markers for each section. 
+Ensure each block has <!-- SECTION: nav --> ... <!-- END: nav -->, etc. No leftover code fences. 
+Make it visually appealing, transitions, glass style.`
+        }
       ],
-      max_tokens:3500,
+      max_tokens:4000, // << increased to 4000
       temperature:0.9
     });
 
     let siteCode= gptResponse.data.choices[0].message.content.trim();
     progressMap[requestId].progress=40;
 
-    // images
     const imagesObj={};
-
-    // nav & footer => 256x256
     let logoPrompt;
     let heroPrompt;
     if(projectType.toLowerCase()==='nft'){
-      logoPrompt= `256x256 NFT style brand logo for "${coinName}", color palette "${colorPalette}", must look good on a ${themeSelection} background. Transparent. No text.`;
-      heroPrompt= `1024x1024 NFT banner referencing "${coinName}", color palette "${colorPalette}", suitable for ${themeSelection} theme. Subtle.`;
+      logoPrompt= `256x256 NFT style brand logo for "${coinName}", color palette "${colorPalette}", suits a ${themeSelection} background, transparent, no text.`;
+      heroPrompt= `1024x1024 NFT banner referencing "${coinName}", color palette "${colorPalette}", for a ${themeSelection} theme, subtle text or shape.`;
     } else {
-      logoPrompt= `256x256 memecoin token logo for "${coinName}", color palette "${colorPalette}", must look good on a ${themeSelection} background. Transparent. No text.`;
-      heroPrompt= `1024x1024 background referencing "${coinName}" in a memecoin style, color palette "${colorPalette}", for a ${themeSelection} theme. Subtle.`;
+      logoPrompt= `256x256 memecoin token logo for "${coinName}", color palette "${colorPalette}", suits a ${themeSelection} background, transparent, no text.`;
+      heroPrompt= `1024x1024 memecoin banner referencing "${coinName}", color palette "${colorPalette}", for a ${themeSelection} theme, subtle.`;
     }
-
+    // nav/footer
     try{
       progressMap[requestId].progress=45;
-      const navResp=await openai.createImage({prompt:logoPrompt,n:1,size:"256x256"});
-      const navUrl=navResp.data.data[0].url;
-      const navBuf=await (await fetch(navUrl)).arrayBuffer();
-      const navBase64="data:image/png;base64,"+Buffer.from(navBuf).toString("base64");
-      imagesObj.navLogo=navBase64;
-      imagesObj.footerImg=navBase64;
+      const navResp=await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256"});
+      const navUrl= navResp.data.data[0].url;
+      const navBuf= await (await fetch(navUrl)).arrayBuffer();
+      imagesObj.navLogo= "data:image/png;base64," + Buffer.from(navBuf).toString("base64");
+      imagesObj.footerImg= imagesObj.navLogo;
     }catch(err){
-      console.error("Nav/footer image error:",err);
+      console.error("Nav/Footer logo error:",err);
       const fallback="data:image/png;base64,iVBORw0K...";
-      imagesObj.navLogo=fallback;
-      imagesObj.footerImg=fallback;
+      imagesObj.navLogo= fallback;
+      imagesObj.footerImg= fallback;
     }
 
     // hero
     try{
       progressMap[requestId].progress=55;
-      const heroResp=await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
-      const heroUrl= heroResp.data.data[0].url;
+      const heroResp=await openai.createImage({ prompt:heroPrompt, n:1, size:"1024x1024"});
+      const heroUrl=heroResp.data.data[0].url;
       const heroBuf=await (await fetch(heroUrl)).arrayBuffer();
-      imagesObj.heroBg="data:image/png;base64,"+ Buffer.from(heroBuf).toString("base64");
+      imagesObj.heroBg= "data:image/png;base64," + Buffer.from(heroBuf).toString("base64");
     }catch(err){
       console.error("Hero BG error:",err);
       imagesObj.heroBg="data:image/png;base64,iVBORw0K...";
@@ -527,8 +526,7 @@ No leftover code fences.
     // remove leftover code fences
     siteCode= siteCode.replace(/```+/g,"");
     progressMap[requestId].progress=60;
-
-    progressMap[requestId].code=siteCode;
+    progressMap[requestId].code= siteCode;
     progressMap[requestId].images= imagesObj;
     progressMap[requestId].status="done";
     progressMap[requestId].progress=100;
@@ -537,11 +535,10 @@ No leftover code fences.
     user.generatedFiles.push({
       requestId,
       content: siteCode,
-      generatedAt: new Date()
+      generatedAt:new Date()
     });
     await user.save();
-
-  }catch(error){
+  } catch(error){
     console.error("Error in background generation:",error);
     progressMap[requestId].status="error";
     progressMap[requestId].progress=100;
@@ -549,11 +546,12 @@ No leftover code fences.
 }
 
 /**************************************************
- * POST /generate-section => Refresh single section
- * Costs 0.25 credits
+ * POST /generate-section => refresh single section
+ * costs 0.25 credits
+ * also set max_tokens=4000
  **************************************************/
 app.post('/generate-section', async(req,res)=>{
-  const {walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc}= req.body;
+  const {walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc} = req.body;
   if(!walletAddress||!section){
     return res.status(400).json({error:"Missing walletAddress or section."});
   }
@@ -563,66 +561,58 @@ app.post('/generate-section', async(req,res)=>{
       return res.status(400).json({error:"Invalid wallet address."});
     }
     if(user.credits<0.25){
-      return res.status(400).json({error:"Insufficient credits (need 0.25) to refresh a single section."});
+      return res.status(400).json({error:"Insufficient credits (need 0.25)."});
     }
-
-    // deduct 0.25
     user.credits-=0.25;
     await user.save();
 
-    // GPT
     const systemPrompt=`
 You are GPT-4. Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
-Use color palette "${colorPalette}", theme "${themeSelection}",
-comment markers <!-- SECTION: ${section} --> ... <!-- END: ${section} -->,
-and placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
+Use color palette "${colorPalette}", theme "${themeSelection}".
+Wrap it with <!-- SECTION: ${section} --> ... <!-- END: ${section} -->.
+Use placeholders if needed: ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
 ProjectDesc: ${projectDesc}
-No leftover code fences.
+No leftover code fences. 
 `;
-    const gptResp=await openai.createChatCompletion({
+    const gptResp= await openai.createChatCompletion({
       model:"gpt-4",
       messages:[
         {role:"system", content:systemPrompt},
-        {role:"user", content:`Generate ONLY that [${section}] snippet, with markers. No <html> or <body> tags.`}
+        {
+          role:"user",
+          content:`Generate ONLY that section snippet (including <!-- SECTION: ${section} -->). No <html> or <body> tags.`
+        }
       ],
-      max_tokens:1200,
+      max_tokens:4000, // increased
       temperature:0.9
     });
-
     let snippet= gptResp.data.choices[0].message.content.trim();
     snippet= snippet.replace(/```+/g,"");
 
-    // Optionally an image
     const imagesObj={};
     if(section.toLowerCase()==='nav'){
       try{
-        const navPrompt= `256x256 logo for "${coinName}", color: "${colorPalette}", for a ${themeSelection} theme. Transparent. No extra text.`;
-        const navImageResp= await openai.createImage({prompt:navPrompt,n:1,size:"256x256"});
-        const navUrl= navImageResp.data.data[0].url;
-        const navBuf= await (await fetch(navUrl)).arrayBuffer();
-        imagesObj.sectionImage="data:image/png;base64,"+Buffer.from(navBuf).toString("base64");
+        const navPrompt= `256x256 logo for "${coinName}", color:"${colorPalette}", theme:"${themeSelection}". Transparent, no text.`;
+        const navResp= await openai.createImage({prompt:navPrompt,n:1,size:"256x256"});
+        const navUrl= navResp.data.data[0].url;
+        const navBuf=await (await fetch(navUrl)).arrayBuffer();
+        imagesObj.sectionImage= "data:image/png;base64,"+ Buffer.from(navBuf).toString("base64");
       }catch(err){
         console.error("Nav partial generation error:",err);
       }
-    }else if(section.toLowerCase()==='hero'){
+    } else if(section.toLowerCase()==='hero'){
       try{
-        const heroPrompt= `1024x1024 hero banner referencing "${coinName}", color: "${colorPalette}", for a ${themeSelection} theme. Transparent style.`;
-        const heroImageResp= await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
-        const heroUrl= heroImageResp.data.data[0].url;
+        const heroPrompt= `1024x1024 hero banner referencing "${coinName}", color:"${colorPalette}", theme:"${themeSelection}". Subtle. Transparent if possible.`;
+        const heroResp= await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
+        const heroUrl= heroResp.data.data[0].url;
         const heroBuf= await (await fetch(heroUrl)).arrayBuffer();
-        imagesObj.sectionImage="data:image/png;base64,"+Buffer.from(heroBuf).toString("base64");
+        imagesObj.sectionImage= "data:image/png;base64,"+ Buffer.from(heroBuf).toString("base64");
       }catch(err){
         console.error("Hero partial generation error:",err);
       }
     }
-    // etc. for other sections if desired
-
-    return res.json({
-      snippet,
-      images: imagesObj,
-      newCredits: user.credits
-    });
-
+    // etc for other sections
+    return res.json({snippet, images: imagesObj, newCredits:user.credits});
   }catch(err){
     console.error("Error in /generate-section:",err);
     return res.status(500).json({error:"Internal server error."});
@@ -630,14 +620,12 @@ No leftover code fences.
 });
 
 /**************************************************
- * POST /connect-wallet, /scan-deposits, etc.
- * etc. (the rest of your code is unchanged)
+ * The rest of your wallet endpoints remain same
  **************************************************/
-
 /**************************************************
  * Error Handling
  **************************************************/
-app.use((err, req, res, next)=>{
+app.use((err,req,res,next)=>{
   if(err instanceof SyntaxError){
     console.error("Syntax Error:",err);
     return res.status(400).json({error:"Invalid JSON payload."});
