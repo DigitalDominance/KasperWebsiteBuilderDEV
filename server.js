@@ -441,8 +441,8 @@ Use snippet below for partial inspiration (no code fences):
     if(projectType.toLowerCase()==='nft'){
       // mention cryptopunks style
       systemPrompt+=`
-    You are a website building ai. Generate the single HTML file with EXACT comment markers for each section:
-     <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color palette for tones.
+    You are a website building ai now building a site for the crypto nft project "${coinName}". here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section:
+     <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color palette for tones. and a "${themeSelection}" theme for the site
       1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent NFT logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
       2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
       3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
@@ -458,8 +458,8 @@ Use snippet below for partial inspiration (no code fences):
     } else {
       // if token
       systemPrompt+=`
-       You are a website building ai. Generate the single HTML file with EXACT comment markers for each section: 
-        <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color pallete for tones.
+       You are a website building ai now building a site for the crypto token "${coinName}".here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section: 
+        <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color pallete for tones. and a "${themeSelection}" theme for the site
          1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
         2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
         3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
