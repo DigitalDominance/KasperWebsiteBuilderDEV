@@ -26,11 +26,11 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function(origin, callback) {
-    if(!origin) return callback(null, true);
+  origin: function(origin, callback){
+    if(!origin) return callback(null,true);
     if(allowedOrigins.indexOf(origin)===-1){
       const msg=`The CORS policy for this site does not allow access from ${origin}`;
-      return callback(new Error(msg), false);
+      return callback(new Error(msg),false);
     }
     return callback(null,true);
   },
@@ -43,7 +43,8 @@ app.use(bodyParser.json());
 mongoose.connect(process.env.MONGO_URI,{
   useNewUrlParser:true,
   useUnifiedTopology:true
-}).then(()=> console.log('Connected to MongoDB'))
+})
+.then(()=> console.log('Connected to MongoDB'))
 .catch(err=>{
   console.error('Failed to connect to MongoDB:',err);
   process.exit(1);
@@ -56,7 +57,7 @@ const configuration=new Configuration({
 const openai=new OpenAIApi(configuration);
 
 /**************************************************
- * In-Memory Progress & Results
+ * In-Memory
  **************************************************/
 const progressMap={};
 function generateRequestId(){
@@ -74,30 +75,32 @@ app.get('/',(req,res)=>{
 });
 
 /**************************************************
- * POST /start-generation (costs 1 credit)
+ * POST /start-generation (1 credit)
  **************************************************/
 app.post('/start-generation', async(req,res)=>{
-  const {walletAddress,userInputs}= req.body;
+  const { walletAddress, userInputs }=req.body;
   if(!walletAddress||!userInputs){
     return res.status(400).json({error:"walletAddress and userInputs are required."});
   }
-  const {coinName,colorPalette,projectType,themeSelection,projectDesc}= userInputs;
+  const { coinName, colorPalette, projectType, themeSelection, projectDesc }= userInputs;
   if(!projectType||!['nft','token'].includes(projectType.toLowerCase())){
     return res.status(400).json({error:"projectType must be 'nft' or 'token'."});
   }
   if(!themeSelection||!['dark','light'].includes(themeSelection.toLowerCase())){
     return res.status(400).json({error:"themeSelection must be 'dark' or 'light'."});
   }
+
   try{
     // Deduct 1 credit
     const user= await User.findOneAndUpdate(
-      {walletAddress, credits:{$gte:1}},
+      {walletAddress,credits:{$gte:1}},
       {$inc:{credits:-1}},
       {new:true}
     );
     if(!user){
       return res.status(400).json({error:"Insufficient credits or invalid wallet address."});
     }
+
     const requestId= generateRequestId();
     progressMap[requestId]={
       status:'in-progress',
@@ -105,17 +108,19 @@ app.post('/start-generation', async(req,res)=>{
       code:null,
       images:{}
     };
+
     doWebsiteGeneration(requestId,userInputs,user).catch(err=>{
       console.error("Background generation error:",err);
       progressMap[requestId].status='error';
       progressMap[requestId].progress=100;
-      // Refund on error
+      // Refund
       User.findOneAndUpdate({walletAddress},{$inc:{credits:1}})
       .catch(refundErr=>console.error("Failed to refund credit:",refundErr));
     });
+
     return res.json({requestId});
   } catch(err){
-    console.error("Error starting generation:", err);
+    console.error("Error starting generation:",err);
     return res.status(500).json({error:"Internal server error."});
   }
 });
@@ -124,7 +129,7 @@ app.post('/start-generation', async(req,res)=>{
  * GET /progress?requestId=XYZ
  **************************************************/
 app.get('/progress',(req,res)=>{
-  const {requestId}= req.query;
+  const {requestId}=req.query;
   if(!requestId||!progressMap[requestId]){
     return res.status(400).json({error:"Invalid or missing requestId"});
   }
@@ -215,13 +220,13 @@ app.get('/get-credits', async(req,res)=>{
     return res.status(400).json({success:false,error:"walletAddress is required."});
   }
   try{
-    const user=await User.findOne({walletAddress});
+    const user= await User.findOne({walletAddress});
     if(!user){
       return res.status(400).json({success:false,error:"Invalid wallet address."});
     }
     return res.json({success:true, credits:user.credits});
-  } catch(err){
-    console.error("Error fetching credits:", err);
+  }catch(err){
+    console.error("Error fetching credits:",err);
     return res.status(500).json({success:false,error:"Internal server error."});
   }
 });
@@ -235,17 +240,17 @@ app.post('/create-wallet', async(req,res)=>{
     return res.status(400).json({success:false,error:"Username and password are required."});
   }
   try{
-    const existingUser= await User.findOne({username});
+    const existingUser=await User.findOne({username});
     if(existingUser){
       return res.status(400).json({success:false,error:"Username already exists. Please choose another one."});
     }
-    const walletData= await createWallet();
+    const walletData=await createWallet();
     if(!walletData.success){
       return res.status(500).json({success:false,error:"Wallet creation failed."});
     }
-    const {receivingAddress,xPrv,mnemonic}= walletData;
+    const {receivingAddress,xPrv,mnemonic}=walletData;
     const saltRounds=10;
-    const passwordHash= await bcrypt.hash(password,saltRounds);
+    const passwordHash=await bcrypt.hash(password,saltRounds);
 
     const newUser=new User({
       username,
@@ -259,7 +264,7 @@ app.post('/create-wallet', async(req,res)=>{
     await newUser.save();
     return res.json({success:true, walletAddress:receivingAddress});
   }catch(err){
-    if(err.code===11000 && err.keyPattern && err.keyPattern.username){
+    if(err.code===11000&&err.keyPattern&&err.keyPattern.username){
       return res.status(400).json({success:false,error:"Username already exists. Please choose another one."});
     }
     console.error("Error creating wallet:",err);
@@ -280,7 +285,7 @@ app.post('/connect-wallet', async(req,res)=>{
     if(!user){
       return res.status(400).json({success:false,error:"Invalid wallet address or password."});
     }
-    const match= await bcrypt.compare(password,user.passwordHash);
+    const match=await bcrypt.compare(password,user.passwordHash);
     if(!match){
       return res.status(400).json({success:false,error:"Invalid wallet address or password."});
     }
@@ -292,7 +297,7 @@ app.post('/connect-wallet', async(req,res)=>{
       generatedFiles:user.generatedFiles
     });
   }catch(err){
-    console.error("Error connecting wallet:", err);
+    console.error("Error connecting wallet:",err);
     return res.status(500).json({success:false,error:"Internal server error."});
   }
 });
@@ -300,14 +305,14 @@ app.post('/connect-wallet', async(req,res)=>{
 /**************************************************
  * POST /scan-deposits
  **************************************************/
-app.post('/scan-deposits',async(req,res)=>{
+app.post('/scan-deposits', async(req,res)=>{
   const {walletAddress}=req.body;
   if(!walletAddress){
     return res.status(400).json({success:false,error:"Missing walletAddress"});
   }
   try{
     await fetchAndProcessUserDeposits(walletAddress);
-    const user= await User.findOne({walletAddress});
+    const user=await User.findOne({walletAddress});
     if(!user){
       return res.status(404).json({success:false,error:"User not found"});
     }
@@ -321,7 +326,7 @@ app.post('/scan-deposits',async(req,res)=>{
 /**************************************************
  * POST /save-generated-file
  **************************************************/
-app.post('/save-generated-file',async(req,res)=>{
+app.post('/save-generated-file', async(req,res)=>{
   const {walletAddress,requestId,content}= req.body;
   if(!walletAddress||!requestId||!content){
     return res.status(400).json({success:false,error:"All fields are required."});
@@ -353,7 +358,7 @@ app.get('/get-user-generations', async(req,res)=>{
     return res.status(400).json({success:false,error:"Missing walletAddress."});
   }
   try{
-    const user= await User.findOne({walletAddress}).lean();
+    const user=await User.findOne({walletAddress}).lean();
     if(!user){
       return res.status(404).json({success:false,error:"User not found."});
     }
@@ -385,20 +390,18 @@ app.get('/get-user-generations', async(req,res)=>{
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user){
   try{
-    const {coinName,colorPalette,projectType,themeSelection,projectDesc}= userInputs||{};
+    const { coinName, colorPalette, projectType, themeSelection, projectDesc }= userInputs||{};
     progressMap[requestId].progress=10;
 
-    // Combine disclaimers + 6 exchange cards + disclaimers from old code
-    // plus advanced transitions, gradient text, etc.
-
+    // We keep using your snippetInspiration
     const snippetInspiration=`
 <html>
 <head>
   <style>
     /* Example gradient & shimmer */
     body {
-      margin:0; padding:0;
-      font-family:sans-serif;
+      margin: 0; padding: 0;
+      font-family: sans-serif;
     }
     .shimmer-bg {
       background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.1) 100%);
@@ -406,8 +409,8 @@ async function doWebsiteGeneration(requestId, userInputs, user){
       animation: shimmerMove 2s infinite;
     }
     @keyframes shimmerMove {
-      0% { background-position:-200% 0; }
-      100%{ background-position:200% 0; }
+      0% { background-position:-200% 0;}
+      100%{ background-position:200% 0;}
     }
   </style>
 </head>
@@ -417,53 +420,82 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 </html>
 `;
 
+    // We'll build a super-super-detailed system message.
+    // We incorporate disclaimers, 6 exchange cards, disclaimers, references to cryptopunks for NFT,
+    // advanced transitions, etc.
     let systemPrompt=`
-You are GPT-4. Generate a single-page HTML/CSS/JS site for a ${projectType} project named "${coinName}",
-with color palette "${colorPalette}" and a ${themeSelection} theme.
-It MUST have 7 sections (nav, hero, roadmap, tokenomics, exchanges, about, footer),
-and disclaimers about it not being financial advice, plus 6 exchange cards, advanced transitions, disclaimers, etc.
-Use placeholders: NAV_IMAGE_PLACEHOLDER, HERO_BG_PLACEHOLDER, FOOTER_IMAGE_PLACEHOLDER.
-Reference snippet for partial inspiration:
-${snippetInspiration}
-ProjectDesc: ${projectDesc}
-No leftover code fences.
+    You are a website building ai. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
+- Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
+- Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
+- For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
+- Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
+- Buttons are placeholders only. Not clickable.
+- Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+- No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+
+Use snippet below for partial inspiration (no code fences):
 `;
 
-    // If it's an NFT, we want a special mention that the nav is an NFT style brand logo
-    // and hero is a blurred version referencing the NFT name
     if(projectType.toLowerCase()==='nft'){
+      // mention cryptopunks style
       systemPrompt+=`
-Additionally, for NFT:
-- The nav must be a "256x256 NFT style brand logo referencing '${coinName}'".
-- The hero must be a "blurred version referencing '${coinName}'" (but do not say 'blur' in the prompt to DALL-E, we handle that from the code).
-`;
+    You are a website building ai. The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards.
+      1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent NFT logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
+      2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
+      3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
+      4) A heading and under it a subheading component and then under it a NFT distribution section with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+      5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+      6) A heading and under it a subheading component and then under it a collection section with 8 placeholder cards for example nfts. Beatiful looks nicely sized cards, advanced and creative CSS and js
+      7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
+    - Buttons are placeholders only. Not clickable.
+    - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+    - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+    
+    Use snippet below for partial inspiration (no code fences):`;
+    } else {
+      // if token
+      systemPrompt+=`
+       You are a website building ai. The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards.
+         1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
+        2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
+        3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
+        4) A heading and under it a subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+        5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+        6) A heading and under it a subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
+        7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
+        no leftover code fences. fake buttons.
+         - Buttons are placeholders only. Not clickable.
+        - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+        - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+    
+      `;
     }
 
     progressMap[requestId].progress=20;
 
     let gptResponse;
     try{
-      gptResponse= await openai.createChatCompletion({
-        model:"gpt-4",
+      gptResponse=await openai.createChatCompletion({
+        model:"gpt-4o",
         messages:[
           {role:"system", content:systemPrompt},
           {
             role:"user",
             content:`Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav --> ... <!-- END: nav -->, etc.
-Include disclaimers, 6 exchange cards, big disclaimers, advanced transitions, gradient text, no leftover code fences.`
+<!-- SECTION: nav -->, etc. 
+We want disclaimers, 6 exchange cards, advanced transitions, disclaimers, advanced glass, gradient text, etc.`
           }
         ],
         max_tokens:4000,
         temperature:0.9
       });
     } catch(err){
-      // If we get a 429 from openAI, handle gracefully
       if(err.response && err.response.status===429){
         console.error("OpenAI rate limit error in doWebsiteGeneration:", err.response.data);
         progressMap[requestId].status='error';
         progressMap[requestId].progress=100;
-        return; // we bail out
+        return;
       }
       throw err;
     }
@@ -471,49 +503,55 @@ Include disclaimers, 6 exchange cards, big disclaimers, advanced transitions, gr
     let siteCode= gptResponse.data.choices[0].message.content.trim();
     progressMap[requestId].progress=40;
 
-    // We'll generate images:
+    // We'll generate images
     const imagesObj={};
-    let logoPrompt,heroPrompt;
-    // For NFT vs. token
+    let logoPrompt, heroPrompt;
     if(projectType.toLowerCase()==='nft'){
-      logoPrompt= `256x256 NFT style brand logo referencing "${coinName}", color palette "${colorPalette}", suits a ${themeSelection} background, transparent, no text.`;
-      heroPrompt= `1024x1024 (blur reference) version referencing "${coinName}", color palette "${colorPalette}", for a ${themeSelection} theme, subtle.`;
+      logoPrompt= `256x256 NFT image for the project "${coinName}", following the color palette "${colorPalette}", 
+suits a ${themeSelection} theme, transparent, no text, cryptopunks-inspired.`;
+      heroPrompt= `1024x1024 NFT banner like banner referencing "${coinName}" nft project style, color palette "${colorPalette}", 
+for a ${themeSelection} theme, subtle. 
+No leftover text.`;
     } else {
-      logoPrompt= `256x256 memecoin token logo referencing "${coinName}", color palette "${colorPalette}", suits a ${themeSelection} background, transparent, no text.`;
-      heroPrompt= `1024x1024 memecoin banner referencing "${coinName}", color palette "${colorPalette}", for a ${themeSelection} theme, subtle.`;
+      logoPrompt= `256x256 memecoin token logo referencing "${coinName}", color palette "${colorPalette}", 
+suits a ${themeSelection} theme, transparent, no text. 
+Include an icon or shape referencing the coin.`;
+      heroPrompt= `1024x1024 memecoin banner referencing "${coinName}", color palette "${colorPalette}", 
+for a ${themeSelection} theme, subtle. 
+No leftover text.`;
     }
 
     // nav/footer
     try{
       progressMap[requestId].progress=45;
-      const navResp= await openai.createImage({prompt:logoPrompt,n:1,size:"256x256"});
+      const navResp=await openai.createImage({prompt:logoPrompt,n:1,size:"256x256"});
       const navUrl= navResp.data.data[0].url;
-      const navBuf= await (await fetch(navUrl)).arrayBuffer();
-      imagesObj.navLogo= "data:image/png;base64," + Buffer.from(navBuf).toString("base64");
+      const navBuf=await (await fetch(navUrl)).arrayBuffer();
+      imagesObj.navLogo="data:image/png;base64,"+ Buffer.from(navBuf).toString("base64");
       imagesObj.footerImg= imagesObj.navLogo;
-    }catch(err){
+    } catch(err){
       if(err.response && err.response.status===429){
-        console.error("OpenAI rate limit error generating nav/footer:",err.response.data);
+        console.error("OpenAI rate limit error generating nav/footer:", err.response.data);
       } else {
-        console.error("Nav/footer generation error:",err);
+        console.error("Nav/footer generation error:", err);
       }
       const fallback="data:image/png;base64,iVBORw0K...";
-      imagesObj.navLogo= fallback;
-      imagesObj.footerImg= fallback;
+      imagesObj.navLogo=fallback;
+      imagesObj.footerImg=fallback;
     }
 
     // hero
     try{
       progressMap[requestId].progress=55;
-      const heroResp= await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
+      const heroResp=await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
       const heroUrl= heroResp.data.data[0].url;
-      const heroBuf= await (await fetch(heroUrl)).arrayBuffer();
-      imagesObj.heroBg= "data:image/png;base64,"+ Buffer.from(heroBuf).toString("base64");
-    }catch(err){
+      const heroBuf=await (await fetch(heroUrl)).arrayBuffer();
+      imagesObj.heroBg="data:image/png;base64,"+ Buffer.from(heroBuf).toString("base64");
+    } catch(err){
       if(err.response && err.response.status===429){
-        console.error("OpenAI rate limit error generating hero:",err.response.data);
+        console.error("OpenAI rate limit error generating hero:", err.response.data);
       } else {
-        console.error("Hero BG error:",err);
+        console.error("Hero BG error:", err);
       }
       imagesObj.heroBg="data:image/png;base64,iVBORw0K...";
     }
@@ -523,30 +561,30 @@ Include disclaimers, 6 exchange cards, big disclaimers, advanced transitions, gr
     progressMap[requestId].progress=60;
     progressMap[requestId].code= siteCode;
     progressMap[requestId].images= imagesObj;
-    progressMap[requestId].status="done";
+    progressMap[requestId].status='done';
     progressMap[requestId].progress=100;
 
-    // Save to DB (placeholder version)
+    // Save placeholder version to DB
     user.generatedFiles.push({
       requestId,
       content: siteCode,
-      generatedAt:new Date()
+      generatedAt: new Date()
     });
     await user.save();
 
   } catch(error){
-    console.error("Error in background generation:",error);
-    progressMap[requestId].status="error";
+    console.error("Error in background generation:", error);
+    progressMap[requestId].status='error';
     progressMap[requestId].progress=100;
   }
 }
 
 /**************************************************
  * POST /generate-section => refresh single section
- * costs 0.25 credits
+ * costs 0.25
  **************************************************/
 app.post('/generate-section', async(req,res)=>{
-  const {walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc}= req.body;
+  const {walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc}=req.body;
   if(!walletAddress||!section){
     return res.status(400).json({error:"Missing walletAddress or section."});
   }
@@ -558,47 +596,45 @@ app.post('/generate-section', async(req,res)=>{
     if(user.credits<0.25){
       return res.status(400).json({error:"Insufficient credits (need 0.25)."});
     }
-    // deduct 0.25
+    // Deduct .25
     user.credits-=0.25;
     await user.save();
 
-    // Build a prompt for a single section snippet
     let systemPrompt=`
 You are GPT-4. Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
 Use color palette "${colorPalette}", theme "${themeSelection}".
-Wrap it with <!-- SECTION: ${section} --> ... <!-- END: ${section} -->.
-Use placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
+Must have <!-- SECTION: ${section} --> ... <!-- END: ${section} --> around it.
+Placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
 ProjectDesc: ${projectDesc}
 No leftover code fences.
 `;
     if(projectType.toLowerCase()==='nft' && section.toLowerCase()==='nav'){
-      // special mention
       systemPrompt+=`
-(NFT nav) => 256x256 NFT style brand logo referencing "${coinName}".
+(NFT nav) => 256x256 NFT style brand logo referencing "${coinName}" (cryptopunks-level style).
+No leftover code fences.
 `;
     } else if(projectType.toLowerCase()==='nft' && section.toLowerCase()==='hero'){
-      // special mention
       systemPrompt+=`
-(NFT hero) => 1024x1024 blurred version referencing "${coinName}" if possible. 
-But do not literally say 'blur' to DALL-E, handle from code side.
+(NFT hero) => 1024x1024 referencing cryptopunks or similar. 
+No leftover code fences.
 `;
     }
 
     let gptResp;
     try{
-      gptResp= await openai.createChatCompletion({
-        model:"gpt-4",
+      gptResp=await openai.createChatCompletion({
+        model:"gpt-4o",
         messages:[
           {role:"system", content:systemPrompt},
           {
             role:"user",
-            content:`Generate ONLY that [${section}] snippet (including <!-- SECTION: ${section} -->). No <html> or <body> tags.`
+            content:`Generate ONLY that [${section}] snippet with markers. No <html> or <body> tags, disclaimers etc.`
           }
         ],
         max_tokens:4000,
         temperature:0.9
       });
-    }catch(err){
+    } catch(err){
       if(err.response && err.response.status===429){
         console.error("OpenAI rate limit error in /generate-section:", err.response.data);
         return res.status(429).json({error:"OpenAI rate limit reached. Please wait and try again."});
@@ -609,39 +645,36 @@ But do not literally say 'blur' to DALL-E, handle from code side.
     let snippet= gptResp.data.choices[0].message.content.trim();
     snippet= snippet.replace(/```+/g,"");
 
-    // optionally generate an image
     const imagesObj={};
     if(section.toLowerCase()==='nav'){
       try{
-        const navPrompt=`256x256 NFT style brand logo referencing "${coinName}", color:"${colorPalette}", theme:"${themeSelection}". Transparent, no text.`;
-        const navResp= await openai.createImage({prompt:navPrompt,n:1,size:"256x256"});
-        const navUrl= navResp.data.data[0].url;
+        const navPrompt=`256x256 NFT style brand logo referencing "${coinName}", color:"${colorPalette}", theme:"${themeSelection}", cryptopunks style, transparent, no text.`;
+        const navResp=await openai.createImage({prompt:navPrompt,n:1,size:"256x256"});
+        const navUrl=navResp.data.data[0].url;
         const navBuf=await (await fetch(navUrl)).arrayBuffer();
         imagesObj.sectionImage="data:image/png;base64,"+ Buffer.from(navBuf).toString("base64");
       }catch(err){
-        console.error("Nav partial generation error:",err);
+        console.error("Nav partial generation error:", err);
       }
     } else if(section.toLowerCase()==='hero'){
       try{
-        const heroPrompt=`1024x1024 hero banner referencing "${coinName}", color:"${colorPalette}", theme:"${themeSelection}". Subtle. Transparent if possible.`;
-        const heroResp= await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
-        const heroUrl= heroResp.data.data[0].url;
+        const heroPrompt=`1024x1024 NFT banner referencing cryptopunks or "${coinName}", color:"${colorPalette}", theme:"${themeSelection}". Subtle. Transparent if possible.`;
+        const heroResp=await openai.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
+        const heroUrl=heroResp.data.data[0].url;
         const heroBuf=await (await fetch(heroUrl)).arrayBuffer();
         imagesObj.sectionImage="data:image/png;base64,"+ Buffer.from(heroBuf).toString("base64");
       }catch(err){
-        console.error("Hero partial generation error:",err);
+        console.error("Hero partial generation error:", err);
       }
     }
-    // etc. for other sections if you want.
 
     return res.json({
       snippet,
       images: imagesObj,
       newCredits: user.credits
     });
-
-  }catch(err){
-    console.error("Error in /generate-section:",err);
+  } catch(err){
+    console.error("Error in /generate-section:", err);
     return res.status(500).json({error:"Internal server error."});
   }
 });
@@ -664,7 +697,7 @@ app.use((err,req,res,next)=>{
 /**************************************************
  * Launch
  **************************************************/
-const PORT= process.env.PORT||5000;
+const PORT=process.env.PORT||5000;
 app.listen(PORT,()=>{
   console.log(`KasperCoin Website Builder API running on port ${PORT}!`);
 });
