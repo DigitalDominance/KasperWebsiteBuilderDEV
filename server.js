@@ -425,7 +425,7 @@ async function doWebsiteGeneration(requestId, userInputs, user){
     // advanced transitions, etc.
     let systemPrompt=`
     You are a website building ai for my app. Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, etc.  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human vertical layout. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+<!-- SECTION: nav -->, <!-- END: NAV --> .  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human vertical layout. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
@@ -442,7 +442,7 @@ Use snippet below for partial inspiration (no code fences):
       // mention cryptopunks style
       systemPrompt+=`
     You are a website building ai. Generate the single HTML file with EXACT comment markers for each section:
-      <!-- SECTION: nav -->, etc.The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. 
+     <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. 
       1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent NFT logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
       2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
       3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
@@ -459,7 +459,7 @@ Use snippet below for partial inspiration (no code fences):
       // if token
       systemPrompt+=`
        You are a website building ai. Generate the single HTML file with EXACT comment markers for each section:
-        <!-- SECTION: nav -->, etc.The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards.
+        <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards.
          1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
         2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
         3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
@@ -486,7 +486,7 @@ Use snippet below for partial inspiration (no code fences):
           {
             role:"user",
             content:`Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, etc. `
+<!-- SECTION: nav -->, <!-- END: nav --> and so on for each section `
           }
         ],
         max_tokens:4000,
