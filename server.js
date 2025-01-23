@@ -602,24 +602,44 @@ app.post('/generate-section', async(req,res)=>{
     user.credits-=0.25;
     await user.save();
 
-    let systemPrompt=`
-You are GPT-4. Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
-Use color palette "${colorPalette}", theme "${themeSelection}".
-Must have <!-- SECTION: ${section} --> ... <!-- END: ${section} --> around it.
-Placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
-ProjectDesc: ${projectDesc}
-No leftover code fences.
-`;
-    if(projectType.toLowerCase()==='nft' && section.toLowerCase()==='nav'){
-      systemPrompt+=`
-(NFT nav) => 256x256 NFT style brand logo referencing "${coinName}" (cryptopunks-level style).
-No leftover code fences.
-`;
-    } else if(projectType.toLowerCase()==='nft' && section.toLowerCase()==='hero'){
-      systemPrompt+=`
-(NFT hero) => 1024x1024 referencing cryptopunks or similar. 
-No leftover code fences.
-`;
+    let systemPrompt = `
+    You are GPT-4. Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
+    Use color palette "${colorPalette}", theme "${themeSelection}".
+    Must have <!-- SECTION: ${section} --> ... <!-- END: ${section} --> around it.
+    Placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
+    ProjectDesc: ${projectDesc}
+    No leftover code fences.
+    `;
+    
+    if (projectType.toLowerCase() === 'nft') {
+      systemPrompt += `
+     you are regenerating one of the below listed website sections for the nft project "${coinName}". here is a quick description of the project "${projectDesc}" .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color palette for tones. and a "${themeSelection}" theme for the site
+      1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent NFT logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
+      2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
+      3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
+      4) A heading and under it a subheading component and then under it a NFT distribution section with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+      5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+      6) A heading and under it a subheading component and then under it a collection section with 8 placeholder cards for example nfts. Beatiful looks nicely sized cards, advanced and creative CSS and js
+      7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
+    - Buttons are placeholders only. Not clickable.
+    - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+    - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+    `;
+    } else if (projectType.toLowerCase() === 'token') {
+      systemPrompt += `
+     you are regenerating one of the below listed website sections for the token "${coinName}".here is a quick description of the project "${projectDesc}" .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color pallete for tones. and a "${themeSelection}" theme for the site
+         1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
+        2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
+        3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
+        4) A heading and under it a subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
+        5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
+        6) A heading and under it a subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
+        7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
+        no leftover code fences. fake buttons.
+         - Buttons are placeholders only. Not clickable.
+        - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+        - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+    `;
     }
 
     let gptResp;
