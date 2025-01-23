@@ -58,7 +58,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 /**************************************************
- * In-Memory Progress & Results
+ * In-Memory Progress & Results (for FULL gen)
  **************************************************/
 const progressMap = {};
 
@@ -79,7 +79,7 @@ app.get('/', (req, res) => {
 });
 
 /**************************************************
- * POST /start-generation
+ * POST /start-generation (FULL site for 1 credit)
  **************************************************/
 app.post('/start-generation', async (req, res) => {
   const { walletAddress, userInputs } = req.body;
@@ -143,7 +143,7 @@ app.post('/start-generation', async (req, res) => {
 });
 
 /**************************************************
- * GET /progress?requestId=XYZ
+ * GET /progress?requestId=XYZ (FULL gen status)
  **************************************************/
 app.get('/progress', (req, res) => {
   const { requestId } = req.query;
@@ -155,7 +155,7 @@ app.get('/progress', (req, res) => {
 });
 
 /**************************************************
- * GET /result?requestId=XYZ
+ * GET /result?requestId=XYZ (FULL gen final code)
  **************************************************/
 app.get('/result', (req, res) => {
   const { requestId } = req.query;
@@ -443,7 +443,7 @@ app.get('/get-user-generations', async (req, res) => {
 });
 
 /**************************************************
- * Main background generation function
+ * Main background generation for FULL site
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user) {
   try {
@@ -451,9 +451,6 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 
     progressMap[requestId].progress = 10;
 
-    /*********************************************
-     * Shared snippet for partial inspiration
-     *********************************************/
     const snippetInspiration = `
 <html>
 <head>
@@ -480,9 +477,6 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 </html>
 `;
 
-    /*********************************************
-     * Decide which system prompt to use
-     *********************************************/
     let systemPrompt;
     if (projectType.toLowerCase() === 'nft') {
       // NFT logic
@@ -532,10 +526,7 @@ ${snippetInspiration}
     // Store images in memory
     const imagesObj = {};
 
-    /*********************************************
-     * Image generation
-     *********************************************/
-    // For NFT vs. Token, also factor in "themeSelection" for the background color
+    // Prompts for images
     let logoPrompt = "";
     let heroPrompt = "";
 
@@ -559,7 +550,6 @@ ${snippetInspiration}
       imagesObj.footerImg = base64Logo; 
     } catch (err) {
       console.error("Nav/Footer logo error:", err);
-      // fallback
       const fallback = "data:image/png;base64,iVBORw0K...";
       imagesObj.navLogo = fallback;
       imagesObj.footerImg = fallback;
@@ -602,6 +592,110 @@ ${snippetInspiration}
   }
 }
 
+/**************************************************
+ * NEW: POST /generate-section (for partial snippet)
+ * Deduct 0.25 credits, generate a snippet for a
+ * specific "section," return snippet + images.
+ **************************************************/
+app.post('/generate-section', async (req, res) => {
+  try {
+    const { walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc } = req.body;
+    if (!walletAddress || !section) {
+      return res.status(400).json({ error: "Missing walletAddress or section field." });
+    }
+
+    // Check user & credits
+    const user = await User.findOne({ walletAddress });
+    if (!user) {
+      return res.status(400).json({ error: "Invalid wallet address." });
+    }
+
+    // Must have at least 0.25 credits
+    if (user.credits < 0.25) {
+      return res.status(400).json({ error: "Insufficient credits for partial regeneration (need 0.25 credits)." });
+    }
+
+    // Deduct 0.25
+    user.credits -= 0.25;
+    await user.save();
+
+    // Decide system prompt for this section
+    const systemPrompt = getSystemPromptForSection(section, {
+      coinName, colorPalette, projectType, themeSelection, projectDesc
+    });
+
+    // GPT call for snippet
+    const gptResp = await openai.createChatCompletion({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Generate ONLY the HTML/CSS/JS snippet for this [${section}] section. 
+No <html> or <head> or <body> tags, just the code for that section. 
+Include a placeholder like ${section.toUpperCase()}_IMAGE_PLACEHOLDER if needed. 
+No leftover code fences.`
+        }
+      ],
+      max_tokens: 1200,
+      temperature: 0.9
+    });
+
+    let snippet = gptResp.data.choices[0].message.content.trim();
+    snippet = snippet.replace(/```+/g, "");
+
+    // Optionally generate images if this section typically needs one
+    const imagesObj = {};
+
+    if (section.toLowerCase() === 'nav') {
+      // Example: generate 256x256 logo
+      try {
+        const logoPrompt = `256x256 logo for ${coinName}, color palette: ${colorPalette}, for a ${themeSelection} style. Transparent.`;
+        const logoResp = await openai.createImage({ prompt: logoPrompt, n:1, size:"256x256" });
+        const logoUrl = logoResp.data.data[0].url;
+        const logoBuf = await (await fetch(logoUrl)).arrayBuffer();
+        imagesObj.sectionImage = "data:image/png;base64," + Buffer.from(logoBuf).toString("base64");
+      } catch (err) {
+        console.error("Nav section image error:", err);
+      }
+    }
+    else if (section.toLowerCase() === 'hero') {
+      // Example: generate 1024x1024 hero
+      try {
+        const heroPrompt = `1024x1024 hero banner referencing ${coinName}, color: ${colorPalette}, theme: ${themeSelection}. Transparent areas if possible.`;
+        const heroResp = await openai.createImage({ prompt: heroPrompt, n:1, size:"1024x1024" });
+        const heroUrl = heroResp.data.data[0].url;
+        const heroBuf = await (await fetch(heroUrl)).arrayBuffer();
+        imagesObj.sectionImage = "data:image/png;base64," + Buffer.from(heroBuf).toString("base64");
+      } catch (err) {
+        console.error("Hero section image error:", err);
+      }
+    }
+    // ... repeat logic for other sections if you want
+
+    // Return snippet + images + updated credits
+    return res.json({
+      snippet,
+      images: imagesObj,
+      newCredits: user.credits
+    });
+  } catch (err) {
+    console.error("Error in /generate-section:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/** Helper to build a system prompt for the given section. */
+function getSystemPromptForSection(section, { coinName, colorPalette, projectType, themeSelection, projectDesc }) {
+  return `
+You are GPT-4. Generate a snippet for the [${section}] section of a ${projectType} site named "${coinName}" (desc: "${projectDesc}").
+Use color palette "${colorPalette}" and a ${themeSelection} theme. 
+Be visually appealing with modern transitions. 
+Use advanced CSS if needed. 
+Insert placeholders if images are needed (like ${section.toUpperCase()}_IMAGE_PLACEHOLDER). 
+No full HTML <head> or <body>, just the snippet for this section.
+`;
+}
 
 /**************************************************
  * Error Handling
