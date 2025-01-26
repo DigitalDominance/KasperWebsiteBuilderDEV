@@ -495,7 +495,7 @@ ${snippetInspiration}
     let gptResponse;
     try {
       gptResponse = await deepseek.createChatCompletion({
-        model: "deepseek-reasoner",  // <--- using the reasoning model
+        model: "deepseek-chat",  // <--- using the reasoning model
         messages: [
           { role: "system", content: systemPrompt },
           {
@@ -666,7 +666,7 @@ app.post('/generate-section', async(req,res)=>{
     let gptResp;
     try{
       gptResp=await deepseek.createChatCompletion({
-        model:"deepseek-reasoner", // <--- using the reasoning model
+        model:"deepseek-chat", // <--- using the reasoning model
         messages:[
           {role:"system", content:systemPrompt},
           {
