@@ -501,7 +501,7 @@ ${snippetInspiration}
           {
             role: "user",
             content: `Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, <!-- END: nav -->, etc. make sure to have all the requested. with all of the requested features. we need everything. a fully finished mobile responsive and computer responsive website.`
+<!-- SECTION: nav -->, <!-- END: nav -->, etc. make sure to have all the requested. with all of the requested features. we need everything. a fully finished mobile responsive and computer responsive website. make sure its nice and center. dont mess up the nav and hero stuff. its important for the images i will seperately generate and insert with my app.`
           }
         ],
         // 'temperature', 'top_p', etc. are not used by deepseek-reasoner.
