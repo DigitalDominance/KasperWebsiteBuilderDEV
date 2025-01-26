@@ -506,7 +506,7 @@ ${snippetInspiration}
         ],
         // 'temperature', 'top_p', etc. are not used by deepseek-reasoner.
         // This model only uses max_tokens for the final answer text.
-        max_tokens: 4000
+        max_tokens: 6000
       });
     } catch (err) {
       if (err.response && err.response.status === 429) {
