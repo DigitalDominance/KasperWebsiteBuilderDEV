@@ -436,8 +436,18 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 `;
 
     let systemPrompt=`
-    You are a website building ai for my app. Create a full finished beautiful site each time and Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, <!-- END: NAV --> .  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+    You are a website building ai for my app. Create a **full finished HTML5 website** each time, including:
+      1) A **DOCTYPE** declaration at the top: `<!DOCTYPE html>`
+      2) A single `<html>` tag containing a `<head>` and a `<body>` block.
+      3) Inside the `<body>` block, output all sections with **EXACT** comment markers for each section, for example:
+      <!-- SECTION: nav -->
+      ... code for nav ...
+      <!-- END: nav -->
+      Do the same for other sections (hero, roadmap, etc.) exactly as my app requires.
+      4) Make sure to put **all** CSS and JS inline in the `<head>` or in `<script>` tags if needed, so it's a **single HTML file**. 
+      No external code fences or leftover triple backticks. 
+  The final output must be strictly HTML, nothing else. No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
+Just provide raw HTML.  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
