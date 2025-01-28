@@ -55,8 +55,8 @@ mongoose.connect(process.env.MONGO_URI,{
 //    (Use your DeepSeek key in process.env.DEEPSEEK_API_KEY)
 // --------------------------------------------------------
 const deepseekConfig = new Configuration({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  basePath: 'https://api.deepseek.com/v1'
+  apiKey: process.env.OPENAI_API_KEY,
+  basePath: 'https://api.openai.com/v1'
 });
 const deepseek = new OpenAIApi(deepseekConfig);
 
@@ -486,7 +486,7 @@ ${snippetInspiration}
     let gptResponse;
     try {
       gptResponse = await deepseek.createChatCompletion({
-        model: "deepseek-reasoner",  // <--- using the reasoning model
+        model: "gpt-4o-mini",  // <--- using the reasoning model
         messages: [
           { role: "system", content: systemPrompt },
           {
