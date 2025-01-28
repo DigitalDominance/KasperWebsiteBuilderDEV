@@ -408,7 +408,6 @@ async function doWebsiteGeneration(requestId, userInputs, user){
     const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs || {};
     progressMap[requestId].progress = 10;
 
-    // We keep your same snippetInspiration
     const snippetInspiration=`
 <html>
 <head>
@@ -465,7 +464,7 @@ ${snippetInspiration}
     // If NFT or token, add more specifics
     if(projectType.toLowerCase() === 'nft'){
       systemPrompt += `
-      the file must be like this <!DOCTYPE html>
+the file must be like this <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -490,10 +489,10 @@ ${snippetInspiration}
     - Buttons are placeholders only. Not clickable.
     - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
     - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
-      `;
+       `;
     } else {
       systemPrompt += `
-    You are a website building ai now building a site for the crypto token "${coinName}".here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section: 
+You are a website building ai now building a site for the crypto token "${coinName}".here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section: 
         <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color pallete for tones. and a "${themeSelection}" theme for the site
          make sure to have all these sections. with all of the requested features. we need everything.
          1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. make sure the image and links are on the same horizontal block and on the left and right like requested. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
@@ -512,11 +511,11 @@ ${snippetInspiration}
 
     progressMap[requestId].progress = 20;
 
-    // TEXT GENERATION via GPT-4 (with your prompt)
+    // TEXT GENERATION via GPT
     let gptResponse;
     try {
       gptResponse = await openAiText.createChatCompletion({
-        model: "gpt-4o-mini",  // or "gpt-3.5-turbo" if you prefer
+        model: "gpt-4o-mini",  
         messages: [
           { role: "system", content: systemPrompt },
           {
@@ -537,7 +536,8 @@ for grapejs put the code in <!DOCTYPE html>
 No leftover code blocks or markdown fences. 
 Ensure it is fully responsive. 
 All advanced animations, glass styling, etc. 
-make sure its formatted for GrapesJS.`
+make sure its formatted for GrapesJS.
+`
           }
         ],
         temperature: 0.7,
@@ -554,73 +554,17 @@ make sure its formatted for GrapesJS.`
     }
 
     let siteCode = gptResponse.data.choices[0].message.content.trim();
-    progressMap[requestId].progress = 40;
-
-    // We'll generate images (DALL·E 3) with openaiImages
-    const imagesObj = {};
-    let logoPrompt, heroPrompt;
-    if(projectType.toLowerCase()==='nft'){
-      logoPrompt= `256x256 NFT image for the project "${coinName}", color palette "${colorPalette}", ${themeSelection} theme, transparent, no text, cryptopunks-inspired.`;
-      heroPrompt= `1024x1024 NFT banner referencing "${coinName}", color palette "${colorPalette}", ${themeSelection} theme, subtle, no text.`;
-    } else {
-      logoPrompt= `256x256 memecoin token logo referencing "${coinName}", color palette "${colorPalette}", ${themeSelection} theme, transparent, no text.`;
-      heroPrompt= `1024x1024 memecoin banner referencing "${coinName}", color palette "${colorPalette}", ${themeSelection} theme, subtle, no text.`;
-    }
-
-    // nav/footer
-    try {
-      progressMap[requestId].progress = 45;
-      const navResp = await openaiImages.createImage({
-        prompt: logoPrompt,
-        n:1,
-        size:"256x256"
-      });
-      const navUrl = navResp.data.data[0].url;
-      const navBuf = await (await fetch(navUrl)).arrayBuffer();
-      imagesObj.navLogo = "data:image/png;base64," + Buffer.from(navBuf).toString("base64");
-      imagesObj.footerImg = imagesObj.navLogo;
-    } catch(err){
-      if(err.response && err.response.status===429){
-        console.error("OpenAI rate limit error generating nav/footer:", err.response.data);
-      } else {
-        console.error("Nav/footer generation error:", err);
-      }
-      // fallback
-      imagesObj.navLogo = "data:image/png;base64,iVBORw0K...";
-      imagesObj.footerImg= imagesObj.navLogo;
-    }
-
-    // hero
-    try {
-      progressMap[requestId].progress = 55;
-      const heroResp = await openaiImages.createImage({
-        prompt: heroPrompt,
-        n:1,
-        size:"1024x1024"
-      });
-      const heroUrl = heroResp.data.data[0].url;
-      const heroBuf = await (await fetch(heroUrl)).arrayBuffer();
-      imagesObj.heroBg = "data:image/png;base64," + Buffer.from(heroBuf).toString("base64");
-    } catch(err){
-      if(err.response && err.response.status===429){
-        console.error("OpenAI rate limit error generating hero:", err.response.data);
-      } else {
-        console.error("Hero BG error:", err);
-      }
-      imagesObj.heroBg = "data:image/png;base64,iVBORw0K...";
-    }
+    progressMap[requestId].progress = 60;
 
     // remove leftover code fences
     siteCode = siteCode.replace(/```+/g,"");
-    progressMap[requestId].progress = 60;
 
-    // Save final code to progressMap
+    // Save final code
     progressMap[requestId].code = siteCode;
-    progressMap[requestId].images= imagesObj;
     progressMap[requestId].status='done';
     progressMap[requestId].progress=100;
 
-    // Save placeholder version to DB
+    // Save to DB
     user.generatedFiles.push({
       requestId,
       content: siteCode,
@@ -637,7 +581,7 @@ make sure its formatted for GrapesJS.`
 
 /**************************************************
  * POST /generate-section => refresh single section
- * costs 0.25
+ * (Removes partial image generation)
  **************************************************/
 app.post('/generate-section', async(req,res)=>{
   const {walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc}=req.body;
@@ -657,93 +601,54 @@ app.post('/generate-section', async(req,res)=>{
     await user.save();
 
     let systemPrompt = `
-    Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
-    Use color palette "${colorPalette}", theme "${themeSelection}".
-    Must have <!-- SECTION: ${section} --> ... <!-- END: ${section} --> and the body stuff around it.
-    Placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
-    ProjectDesc: ${projectDesc}
-    No leftover code fences.
-    `;
+Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}". 
+ Generate the single HTML file with EXACT comment markers for each section: 
+<!-- SECTION: nav -->, <!-- END: NAV --> .  and the file must be like this <!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+{css}
+  </style>
+</head>
+<body>
+{html}
+</body>
+</html> its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
+- Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
+- Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
+- For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
+- Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
+- Buttons are placeholders only. Not clickable.
+- Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+- No leftover code fences just the raw output as i will insert to an iframe, no text just code.
 
-    if (projectType.toLowerCase() === 'nft') {
-      systemPrompt += `
-      you are regenerating one of the below listed website sections for the nft project "${coinName}". here is a quick description of the project "${projectDesc}" .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color palette for tones. and a "${themeSelection}" theme for the site
-      1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent NFT logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
-      2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
-      3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
-      4) A heading and under it a subheading component and then under it a NFT distribution section with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
-      5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
-      6) A heading and under it a subheading component and then under it a collection section with 8 placeholder cards for example nfts. Beatiful looks nicely sized cards, advanced and creative CSS and js
-      7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
-    - Buttons are placeholders only. Not clickable.
-    - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-    - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
-      `;
-    } else {
-      systemPrompt += `
-      you are regenerating one of the below listed website sections for the token "${coinName}".here is a quick description of the project "${projectDesc}" .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color pallete for tones. and a "${themeSelection}" theme for the site
-         1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
-        2) Modern Big glass hero with a blurred bg image with "HERO_BG_PLACEHOLDER" (1024x1024).nicely sized cards Must show coin name "${coinName}" and reference "${projectDesc}". advanced and creative CSS and js Space them nicely though.
-        3) A heading and under it a subheading component and then under it a Vertical roadmap (5 glass steps).nicely sized cards Fancy. advanced and creative CSS and js Make sure their width is fitting to the screen size.
-        4) A heading and under it a subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
-        5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
-        6) A heading and under it a subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
-        7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
-        no leftover code fences. fake buttons.
-         - Buttons are placeholders only. Not clickable.
-        - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-        - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
-      `;
-    }
+Use snippet below for partial inspiration (no code fences):
+`;
 
-    // Chat with GPT-4
     const gptResp = await openAiText.createChatCompletion({
       model: "gpt-4o-mini",
       messages: [
         {role:"system", content:systemPrompt},
         {
           role:"user",
-          content:`Generate ONLY that [${section}] snippet with markers. for grapejs put the code in <!DOCTYPE html><html><head>...<body>... plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
-No leftover code blocks or markdown fences. 
-Ensure it is fully responsive. 
-All advanced animations, glass styling, etc. 
-make sure its formatted for GrapesJS.`
+          content:`Generate ONLY that [${section}] snippet with markers. For example: 
+<!DOCTYPE html><html><head>...<body>... plus the correct comment markers. 
+No leftover code fences. 
+Fully responsive.`
         }
       ],
       max_tokens:2000,
       temperature:0.7
     });
 
-    let snippet = gptResp.data.choices[0].message.content.trim();
+    let snippet= gptResp.data.choices[0].message.content.trim();
     snippet= snippet.replace(/```+/g,"");
-
-    // If the user wants a new nav or hero image, we still use openaiImages
-    const imagesObj={};
-    if(section.toLowerCase()==='nav'){
-      try{
-        const navPrompt=`256x256 NFT or token style brand logo referencing "${coinName}", color:"${colorPalette}", theme:"${themeSelection}", transparent, no text.`;
-        const navResp=await openaiImages.createImage({prompt:navPrompt,n:1,size:"256x256"});
-        const navUrl=navResp.data.data[0].url;
-        const navBuf=await (await fetch(navUrl)).arrayBuffer();
-        imagesObj.sectionImage="data:image/png;base64,"+ Buffer.from(navBuf).toString("base64");
-      }catch(err){
-        console.error("Nav partial image generation error:", err);
-      }
-    } else if(section.toLowerCase()==='hero'){
-      try{
-        const heroPrompt=`1024x1024 banner referencing "${coinName}", color:"${colorPalette}", theme:"${themeSelection}", subtle, no text.`;
-        const heroResp=await openaiImages.createImage({prompt:heroPrompt,n:1,size:"1024x1024"});
-        const heroUrl=heroResp.data.data[0].url;
-        const heroBuf=await (await fetch(heroUrl)).arrayBuffer();
-        imagesObj.sectionImage="data:image/png;base64,"+ Buffer.from(heroBuf).toString("base64");
-      }catch(err){
-        console.error("Hero partial image generation error:", err);
-      }
-    }
 
     return res.json({
       snippet,
-      images: imagesObj,
+      images:{}, // no images generated
       newCredits: user.credits
     });
   } catch(err){
