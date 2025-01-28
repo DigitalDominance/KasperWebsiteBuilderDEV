@@ -465,6 +465,18 @@ ${snippetInspiration}
     // If NFT or token, add more specifics
     if(projectType.toLowerCase() === 'nft'){
       systemPrompt += `
+      the file must be like this <!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+{css}
+  </style>
+</head>
+<body>
+{html}
+</body>
+</html>
      You are a website building ai now building a site for the crypto nft project "${coinName}". here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section:
      <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color palette for tones. and a "${themeSelection}" theme for the site
       make sure to have all these sections.
