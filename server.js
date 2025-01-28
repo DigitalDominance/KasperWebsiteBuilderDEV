@@ -436,34 +436,7 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 `;
 
     let systemPrompt=`
-    You are a website building ai for my app i need u to format it for my app properly which uses grape js and also needs those section tags. Create a **full finished HTML5 website each time, including:
-      <!DOCTYPE html>
-<html>
-  <head>
-    <!-- Put all CSS here (no external references or code fences) -->
-  </head>
-  <body>
-
-    <!-- SECTION: nav -->
-    [nav code here]
-    <!-- END: nav -->
-
-    <!-- SECTION: hero -->
-    [hero code here]
-    <!-- END: hero -->
-
-    <!-- SECTION: roadmap -->
-    [roadmap code here]
-    <!-- END: roadmap -->
-
-    ... etc ...
-
-  </body>
-</html>
-
-Exactly follow the above structure.
-  The final output must be strictly HTML, nothing else. No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
-Just provide raw HTML.  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+     Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
@@ -527,7 +500,36 @@ ${snippetInspiration}
           {
             role: "user",
             content: `Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, <!-- END: nav -->, etc. make sure to have all the requested. with all of the requested features and cards are proper sizing. cards should have a grid layout under headings and subheadings. we need everything. a fully finished mobile responsive and computer responsive website. make sure its nice and center. dont mess up the nav and hero stuff. its important for the images i will seperately generate and insert with my app.`
+<!-- SECTION: nav -->, <!-- END: nav -->, etc. make sure to have all the requested. with all of the requested features and cards are proper sizing. 
+You are a website building ai for my app i need u to format it for my app properly which uses grape js and also needs those section tags. Create a **full finished HTML5 website each time, including:
+      <!DOCTYPE html>
+<html>
+  <head>
+    <!-- Put all CSS here (no external references or code fences) -->
+  </head>
+  <body>
+
+    <!-- SECTION: nav -->
+    [nav code here]
+    <!-- END: nav -->
+
+    <!-- SECTION: hero -->
+    [hero code here]
+    <!-- END: hero -->
+
+    <!-- SECTION: roadmap -->
+    [roadmap code here]
+    <!-- END: roadmap -->
+
+    ... etc ...
+
+  </body>
+</html>
+
+Exactly follow the above structure.
+  The final output must be strictly HTML, nothing else. No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
+its integral for my app to work.
+cards should have a grid layout under headings and subheadings. we need everything. a fully finished mobile responsive and computer responsive website. make sure its nice and center. dont mess up the nav and hero stuff. its important for the images i will seperately generate and insert with my app.`
           }
         ],
         // 'temperature', 'top_p', etc. are not used by deepseek-reasoner.
