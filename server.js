@@ -436,7 +436,7 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 `;
 
     let systemPrompt=`
-    You are a website building ai for my app. Create a **full finished HTML5 website** each time, including:
+    You are a website building ai for my app. Create a **full finished HTML5 website each time, including:
       1) A **DOCTYPE** declaration at the top: <!DOCTYPE html>
       2) A single <html> tag containing a <head> and a <body> block.
       3) Inside the <body> block, output all sections with **EXACT** comment markers for each section, for example:
