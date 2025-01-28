@@ -486,14 +486,14 @@ ${snippetInspiration}
     let gptResponse;
     try {
       gptResponse = await deepseek.createChatCompletion({
-        model: "deepseek-chat",  // <--- using the reasoning model
+        model: "deepseek-reasoner",  // <--- using the reasoning model
         messages: [
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, <!-- END: nav -->, etc. make sure to have all the requested. with all of the requested features and cards are proper sizing. 
-You are a website building ai for my app i need u to format it for my app properly which uses grapes js and also needs those section tags. example:
+            content: `Generate the single HTML file following the example structure below.
+make sure to have all the requested. with all of the requested features and cards are proper sizing. 
+i need u to format it for my app properly which uses grapes js and also needs those section tags. example:
       <!DOCTYPE html>
 <html>
   <head>
