@@ -440,12 +440,6 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
-- For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
-- Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
-- Buttons are placeholders only. Not clickable.
-- Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-- No leftover code fences just the raw output as i will insert to an iframe, no text just code.
-
 Use snippet below for partial inspiration (no code fences):
 ${snippetInspiration}
     `;
