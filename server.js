@@ -534,7 +534,7 @@ cards should have a grid layout under headings and subheadings. we need everythi
         ],
         // 'temperature', 'top_p', etc. are not used by deepseek-reasoner.
         // This model only uses max_tokens for the final answer text.
-        max_tokens: 10000
+        max_tokens: 8000
       });
     } catch (err) {
       if (err.response && err.response.status === 429) {
