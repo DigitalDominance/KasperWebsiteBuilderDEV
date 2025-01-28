@@ -465,7 +465,6 @@ ${snippetInspiration}
       7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
     - Buttons are placeholders only. Not clickable.
     - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-    - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
       `;
     } else {
       systemPrompt += `
@@ -482,7 +481,6 @@ ${snippetInspiration}
         no leftover code fences. fake buttons.
          - Buttons are placeholders only. Not clickable.
         - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
-        - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
       `;
     }
 
@@ -501,7 +499,7 @@ ${snippetInspiration}
             role: "user",
             content: `Generate the single HTML file with EXACT comment markers for each section:
 <!-- SECTION: nav -->, <!-- END: nav -->, etc. make sure to have all the requested. with all of the requested features and cards are proper sizing. 
-You are a website building ai for my app i need u to format it for my app properly which uses grape js and also needs those section tags. Create a **full finished HTML5 website each time, including:
+You are a website building ai for my app i need u to format it for my app properly which uses grapes js and also needs those section tags. example:
       <!DOCTYPE html>
 <html>
   <head>
@@ -526,15 +524,15 @@ You are a website building ai for my app i need u to format it for my app proper
   </body>
 </html>
 
-Exactly follow the above structure.
-  The final output must be strictly HTML, nothing else. No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
+Exactly follow the above structure. as an example.
+No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
 its integral for my app to work.
 cards should have a grid layout under headings and subheadings. we need everything. a fully finished mobile responsive and computer responsive website. make sure its nice and center. dont mess up the nav and hero stuff. its important for the images i will seperately generate and insert with my app.`
           }
         ],
         // 'temperature', 'top_p', etc. are not used by deepseek-reasoner.
         // This model only uses max_tokens for the final answer text.
-        max_tokens: 8000
+        max_tokens: 6000
       });
     } catch (err) {
       if (err.response && err.response.status === 429) {
