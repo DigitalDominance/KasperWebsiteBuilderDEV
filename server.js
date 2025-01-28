@@ -500,7 +500,28 @@ ${snippetInspiration}
             role: "user",
             content: `
 Generate the single HTML file with EXACT sections (nav, hero, etc.). 
-for grapejs put the code in <!DOCTYPE html><html><head>...<body>... plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
+for grapejs put the code in <!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="index,follow">
+  <meta name="generator" content="GrapesJS Studio">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body id="ikyd"></body>
+
+</html> as an example plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
 No leftover code blocks or markdown fences. 
 Ensure it is fully responsive. 
 All advanced animations, glass styling, etc. 
