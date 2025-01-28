@@ -50,20 +50,20 @@ mongoose.connect(process.env.MONGO_URI,{
   process.exit(1);
 });
 
-// --------------------------------------------------------
-// 1) DEEPSEEK CONFIG for text/code generation
-//    (Use your DeepSeek key in process.env.DEEPSEEK_API_KEY)
-// --------------------------------------------------------
-const deepseekConfig = new Configuration({
+/**
+ * Create an OpenAI client for TEXT completions
+ * (Previously called "deepseek", but now it's GPT-4).
+ */
+const openAiTextConfig = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
   basePath: 'https://api.openai.com/v1'
 });
-const deepseek = new OpenAIApi(deepseekConfig);
+const openAiText = new OpenAIApi(openAiTextConfig);
 
-// --------------------------------------------------------
-// 2) OPENAI CONFIG for DALL·E 3 images
-//    (Use your OpenAI key in process.env.OPENAI_API_KEY)
-// --------------------------------------------------------
+/**
+ * Create another OpenAI client for DALL·E 3 images
+ * (We keep them separate, but they use the same API key.)
+ */
 const openaiImagesConfig = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
   basePath: 'https://api.openai.com/v1'
@@ -408,7 +408,7 @@ async function doWebsiteGeneration(requestId, userInputs, user){
     const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs || {};
     progressMap[requestId].progress = 10;
 
-    // We keep using your snippetInspiration
+    // We keep your same snippetInspiration
     const snippetInspiration=`
 <html>
 <head>
@@ -436,10 +436,17 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 `;
 
     let systemPrompt=`
-     Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+    You are a website building ai for my app. Create a full finished beautiful site each time and Generate the single HTML file with EXACT comment markers for each section:
+<!-- SECTION: nav -->, <!-- END: NAV --> .  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
+- For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
+- Separate sections in this order a nice css js flow between all sections with fade in and those type of anims:
+- Buttons are placeholders only. Not clickable.
+- Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+- No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+
 Use snippet below for partial inspiration (no code fences):
 ${snippetInspiration}
     `;
@@ -447,7 +454,7 @@ ${snippetInspiration}
     // If NFT or token, add more specifics
     if(projectType.toLowerCase() === 'nft'){
       systemPrompt += `
-    You are a website building ai now building a site for the crypto nft project "${coinName}". here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section:
+     You are a website building ai now building a site for the crypto nft project "${coinName}". here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section:
      <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an nft website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color palette for tones. and a "${themeSelection}" theme for the site
       make sure to have all these sections.
       1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. make sure the image and links are on the same horizontal block and on the left and right like requested. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
@@ -459,10 +466,11 @@ ${snippetInspiration}
       7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
     - Buttons are placeholders only. Not clickable.
     - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+    - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
       `;
     } else {
       systemPrompt += `
-        You are a website building ai now building a site for the crypto token "${coinName}".here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section: 
+    You are a website building ai now building a site for the crypto token "${coinName}".here is a quick description of the project "${projectDesc}" Generate the single HTML file with EXACT comment markers for each section: 
         <!-- SECTION: nav -->, <!-- END: NAV --> .The best in the business. making an memecoin website. utilizing modern styling and css animations. gradients. glass cards. "${colorPalette}" is the color pallete for tones. and a "${themeSelection}" theme for the site
          make sure to have all these sections. with all of the requested features. we need everything.
          1) Modern Looking glass Nav (non-sticky) with a 256x256 transparent token logo fit to a nice size => "NAV_IMAGE_PLACEHOLDER" on the left side and on the right side some placeholder nav links that don't work. make sure the image and links are on the same horizontal block and on the left and right like requested. advanced and creative CSS and js (Also repeated in footer as "FOOTER_IMAGE_PLACEHOLDER", same image). 
@@ -475,74 +483,47 @@ ${snippetInspiration}
         no leftover code fences. fake buttons.
          - Buttons are placeholders only. Not clickable.
         - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
+        - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
       `;
     }
 
     progressMap[requestId].progress = 20;
 
-    // ---------------------------
-    // TEXT GENERATION via DeepSeek Reasoner
-    // ---------------------------
+    // TEXT GENERATION via GPT-4 (with your prompt)
     let gptResponse;
     try {
-      gptResponse = await deepseek.createChatCompletion({
-        model: "gpt-4o-mini",  // <--- using the reasoning model
+      gptResponse = await openAiText.createChatCompletion({
+        model: "gpt-4o-mini",  // or "gpt-3.5-turbo" if you prefer
         messages: [
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Generate the single HTML file following the example structure below.
-make sure to have all the requested. with all of the requested features and cards are proper sizing. 
-i need u to format it for my app properly which uses grapes js and also needs those section tags. example:
-      <!DOCTYPE html>
-<html>
-  <head>
-    <!-- Put all CSS here (no external references or code fences) -->
-  </head>
-  <body>
-
-    <!-- SECTION: nav -->
-    [nav code here]
-    <!-- END: nav -->
-
-    <!-- SECTION: hero -->
-    [hero code here]
-    <!-- END: hero -->
-
-    <!-- SECTION: roadmap -->
-    [roadmap code here]
-    <!-- END: roadmap -->
-
-    ... etc ...
-
-  </body>
-</html>
-
-Exactly follow the above structure. as an example.
-No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
-its integral for my app to work.
-cards should have a grid layout under headings and subheadings. we need everything. a fully finished mobile responsive and computer responsive website. make sure its nice and center. dont mess up the nav and hero stuff. its important for the images i will seperately generate and insert with my app.`
+            content: `
+Generate the single HTML file with EXACT sections (nav, hero, etc.). 
+for grapejs put the code in <!DOCTYPE html><html><head>...<body>... plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
+No leftover code blocks or markdown fences. 
+Ensure it is fully responsive. 
+All advanced animations, glass styling, etc. 
+make sure its formatted for GrapesJS.`
           }
         ],
-        // 'temperature', 'top_p', etc. are not used by deepseek-reasoner.
-        // This model only uses max_tokens for the final answer text.
-        max_tokens: 6000
+        temperature: 0.7,
+        max_tokens: 5000
       });
     } catch (err) {
       if (err.response && err.response.status === 429) {
-        console.error("DeepSeek rate limit error in doWebsiteGeneration:", err.response.data);
-        progressMap[requestId].status = 'error';
-        progressMap[requestId].progress = 100;
+        console.error("OpenAI rate limit error in doWebsiteGeneration:", err.response.data);
+        progressMap[requestId].status='error';
+        progressMap[requestId].progress=100;
         return;
       }
       throw err;
     }
 
-    // The final HTML is in .content; chain-of-thought is in .reasoning_content (we ignore it)
     let siteCode = gptResponse.data.choices[0].message.content.trim();
     progressMap[requestId].progress = 40;
 
-    // We'll generate images (DALL·E) with openaiImages
+    // We'll generate images (DALL·E 3) with openaiImages
     const imagesObj = {};
     let logoPrompt, heroPrompt;
     if(projectType.toLowerCase()==='nft'){
@@ -571,9 +552,9 @@ cards should have a grid layout under headings and subheadings. we need everythi
       } else {
         console.error("Nav/footer generation error:", err);
       }
-      const fallback="data:image/png;base64,iVBORw0K...";
-      imagesObj.navLogo = fallback;
-      imagesObj.footerImg= fallback;
+      // fallback
+      imagesObj.navLogo = "data:image/png;base64,iVBORw0K...";
+      imagesObj.footerImg= imagesObj.navLogo;
     }
 
     // hero
@@ -599,7 +580,9 @@ cards should have a grid layout under headings and subheadings. we need everythi
     // remove leftover code fences
     siteCode = siteCode.replace(/```+/g,"");
     progressMap[requestId].progress = 60;
-    progressMap[requestId].code= siteCode;
+
+    // Save final code to progressMap
+    progressMap[requestId].code = siteCode;
     progressMap[requestId].images= imagesObj;
     progressMap[requestId].status='done';
     progressMap[requestId].progress=100;
@@ -641,9 +624,9 @@ app.post('/generate-section', async(req,res)=>{
     await user.save();
 
     let systemPrompt = `
-    You are DeepSeek Reasoner. Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
+    Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinName}".
     Use color palette "${colorPalette}", theme "${themeSelection}".
-    Must have <!-- SECTION: ${section} --> ... <!-- END: ${section} --> around it.
+    Must have <!-- SECTION: ${section} --> ... <!-- END: ${section} --> and the body stuff around it.
     Placeholders if needed, e.g. ${section.toUpperCase()}_IMAGE_PLACEHOLDER.
     ProjectDesc: ${projectDesc}
     No leftover code fences.
@@ -680,31 +663,25 @@ app.post('/generate-section', async(req,res)=>{
       `;
     }
 
-    // -----------------------------------
-    // TEXT snippet from DeepSeek Reasoner
-    // -----------------------------------
-    let gptResp;
-    try{
-      gptResp=await deepseek.createChatCompletion({
-        model:"deepseek-chat", // <--- using the reasoning model
-        messages:[
-          {role:"system", content:systemPrompt},
-          {
-            role:"user",
-            content:`Generate ONLY that [${section}] snippet with markers. No <html> or <body> tags.`
-          }
-        ],
-        max_tokens:4000
-      });
-    } catch(err){
-      if(err.response && err.response.status===429){
-        console.error("DeepSeek rate limit error in /generate-section:", err.response.data);
-        return res.status(429).json({error:"DeepSeek rate limit reached. Please wait and try again."});
-      }
-      throw err;
-    }
+    // Chat with GPT-4
+    const gptResp = await openAiText.createChatCompletion({
+      model: "gpt-4o-mini",
+      messages: [
+        {role:"system", content:systemPrompt},
+        {
+          role:"user",
+          content:`Generate ONLY that [${section}] snippet with markers. for grapejs put the code in <!DOCTYPE html><html><head>...<body>... plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
+No leftover code blocks or markdown fences. 
+Ensure it is fully responsive. 
+All advanced animations, glass styling, etc. 
+make sure its formatted for GrapesJS.`
+        }
+      ],
+      max_tokens:2000,
+      temperature:0.7
+    });
 
-    let snippet= gptResp.data.choices[0].message.content.trim();
+    let snippet = gptResp.data.choices[0].message.content.trim();
     snippet= snippet.replace(/```+/g,"");
 
     // If the user wants a new nav or hero image, we still use openaiImages
