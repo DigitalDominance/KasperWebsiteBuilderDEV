@@ -436,8 +436,19 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 `;
 
     let systemPrompt=`
-    You are a website building ai for my app. Create a full finished beautiful site each time and Generate the single HTML file with EXACT comment markers for each section:
-<!-- SECTION: nav -->, <!-- END: NAV --> .  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
+    You are a website building ai for my app. Create a full finished beautiful site each time and Generate the single HTML file with EXACT comment markers for each section: 
+<!-- SECTION: nav -->, <!-- END: NAV --> .  and the file must be like this <!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+{css}
+  </style>
+</head>
+<body>
+{html}
+</body>
+</html> its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
 - Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
@@ -502,26 +513,15 @@ ${snippetInspiration}
 Generate the single HTML file with EXACT sections (nav, hero, etc.). 
 for grapejs put the code in <!DOCTYPE html>
 <html>
-
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="robots" content="index,follow">
-  <meta name="generator" content="GrapesJS Studio">
+  <meta charset="utf-8"/>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-    }
+{css}
   </style>
 </head>
-
-<body id="ikyd"></body>
-
-</html> as an example plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
+<body>
+{html}
+</body> as an example plus the correct comment markers for each section example <!-- SECTION: nav -->, <!-- END: NAV --> . 
 No leftover code blocks or markdown fences. 
 Ensure it is fully responsive. 
 All advanced animations, glass styling, etc. 
