@@ -437,14 +437,14 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 
     let systemPrompt=`
     You are a website building ai for my app. Create a **full finished HTML5 website** each time, including:
-      1) A **DOCTYPE** declaration at the top: `<!DOCTYPE html>`
-      2) A single `<html>` tag containing a `<head>` and a `<body>` block.
-      3) Inside the `<body>` block, output all sections with **EXACT** comment markers for each section, for example:
+      1) A **DOCTYPE** declaration at the top: <!DOCTYPE html>
+      2) A single <html> tag containing a <head> and a <body> block.
+      3) Inside the <body> block, output all sections with **EXACT** comment markers for each section, for example:
       <!-- SECTION: nav -->
       ... code for nav ...
       <!-- END: nav -->
       Do the same for other sections (hero, roadmap, etc.) exactly as my app requires.
-      4) Make sure to put **all** CSS and JS inline in the `<head>` or in `<script>` tags if needed, so it's a **single HTML file**. 
+      4) Make sure to put **all** CSS and JS inline in the <head> or in <script> tags if needed, so it's a **single HTML file**. 
       No external code fences or leftover triple backticks. 
   The final output must be strictly HTML, nothing else. No leftover code blocks, and do **not** enclose your answer in Markdown fences. 
 Just provide raw HTML.  its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
