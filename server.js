@@ -143,7 +143,7 @@ app.post('/start-generation', async(req,res)=>{
  * GET /progress?requestId=XYZ
  **************************************************/
 app.get('/progress',(req,res)=>{
-  const {requestId}=req.query;
+  const {requestId}= req.query;
   if(!requestId||!progressMap[requestId]){
     return res.status(400).json({error:"Invalid or missing requestId"});
   }
@@ -229,7 +229,7 @@ ${finalCode}
  * GET /get-credits?walletAddress=XYZ
  **************************************************/
 app.get('/get-credits', async(req,res)=>{
-  const {walletAddress}=req.query;
+  const {walletAddress}= req.query;
   if(!walletAddress){
     return res.status(400).json({success:false,error:"walletAddress is required."});
   }
@@ -320,7 +320,7 @@ app.post('/connect-wallet', async(req,res)=>{
  * POST /scan-deposits
  **************************************************/
 app.post('/scan-deposits', async(req,res)=>{
-  const {walletAddress}=req.body;
+  const {walletAddress}= req.body;
   if(!walletAddress){
     return res.status(400).json({success:false,error:"Missing walletAddress"});
   }
@@ -626,7 +626,7 @@ Use snippet below for partial inspiration (no code fences):
 `;
 
     const gptResp = await openAiText.createChatCompletion({
-      model: "gpt-4o-mini",
+      model: "o3-mini",
       messages: [
         {role:"system", content:systemPrompt},
         {
