@@ -475,7 +475,7 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 {html}
 </body>
 </html> its integral for my app to work. Make sure to properly layout sites. heading then under it subheading. that type of normal human center vertical layout but give a grid layout to components like cards. The best in the business. utilizing modern styling and css animations. gradients. glass cards.
-- Use a gradient of "${colorPalette}" plus the a "${themeSelection}" theme for the color scheming of the background and give an opposite contrast for the components. all sections backgrounds should have a "${themeSelection}" gradient theming following our colors.  keep a consistent theming across the site, gradient and nice looks. 
+- Use a gradient of mainly "${themeSelection}" with a tone of "${colorPalette}" for the color scheming of the background and give an opposite contrast for the components. keep a consistent theming across the site, gradient and nice looks. 
 - Think of the cleanest best websites like apple and others. thats how we need it, not some old 2018 structure.
 - Make all sections fully responsive with strong spacing, advanced transitions, glassmorphism, gradient text, etc. Advanced CSS, fade in animations hover animations etc.
 - For all the sections except nav and footer, first a heading then under it a subheading, then under that the content. stop putting the heading next to the subheading or the subheading next to the content. it has to be stacked like a normal website.
@@ -483,6 +483,7 @@ async function doWebsiteGeneration(requestId, userInputs, user) {
 - Buttons are placeholders only. Not clickable.
 - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
 - No leftover code fences just the raw output as i will insert to an iframe, no text just code.
+-add some placeholder fluff or extra sections if u think its needed.
 
 Use snippet below for partial inspiration (no code fences):
 ${snippetInspiration}
@@ -512,6 +513,7 @@ head
       4) A heading and under it a subheading component and then under it a NFT distribution section with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
       5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
       6) A heading and under it a subheading component and then under it a collection section with 8 placeholder cards for example nfts. Beatiful looks nicely sized cards, advanced and creative CSS and js
+      6.1) feel free to get creative with this section and make a cool thing for their project named "${coinName}" it should be stunning and eyecatching
       7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
     - Buttons are placeholders only. Not clickable.
     - Every element must be thought to match/contrast with the other elements and make sure there is a nice flow. 
@@ -528,6 +530,7 @@ You are a website building ai now building a site for the crypto token "${coinNa
         4) A heading and under it a subheading component and then under it Tokenomics with 3 fancy gradient/glass cards.advanced and creative CSS and js nicely sized cards Under the heading, not next to. Laid out horizontally on computer taking up a whole row of the screen or on mobile vertically laid out.
         5) A heading and under it a subheading component and then under it Exchange/analytics with 6 glass placeholders (laid out nicely).advanced and creative CSS and js nicely sized cards. Under the heading. 2 rows, 3 columns on computer that take up wide enough not so skinny it only takes up one part we need the whole section of the screen and, vertical layout for mobile. Under the heading.
         6) A heading and under it a subheading component and then under it 2 glass-card about section. Beatiful looks nicely sized cards, advanced and creative CSS and js
+        6.1) feel free to get creative with this section and make a cool thing for their project named "${coinName}" it should be stunning and eyecatching
         7) glass Footer section at the bottom not sticky. Uses FOOTER_IMAGE_PLACEHOLDER on the left fit to a nice size and on the right it uses placeholder social links that don't work. fake unclickable buttons.
         no leftover code fences. fake buttons.
          - Buttons are placeholders only. Not clickable.
