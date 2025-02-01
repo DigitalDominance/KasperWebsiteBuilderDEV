@@ -51,10 +51,10 @@ mongoose.connect(process.env.MONGO_URI, {
 
 /**
  * Create a Qwen client for text completions.
- * Note: Qwen is Alibaba Cloud’s product.
- * We now use DASHSCOPE_API_KEY and the Qwen-compatible base URL.
+ * We use the OpenAI SDK’s default export.
+ * Note: You must set DASHSCOPE_API_KEY in your environment.
  */
-const OpenAI = require("openai");
+const OpenAI = require("openai").default;
 const qwen = new OpenAI({
   apiKey: process.env.DASHSCOPE_API_KEY,
   baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -62,7 +62,7 @@ const qwen = new OpenAI({
 
 /**
  * Create another OpenAI client for DALL·E 3 images
- * (We keep these separate; they use the OpenAI API.)
+ * (Uses the OpenAI API.)
  */
 const { Configuration, OpenAIApi } = require('openai');
 const openaiImagesConfig = new Configuration({
