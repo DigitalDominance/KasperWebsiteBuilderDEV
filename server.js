@@ -2,11 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { Configuration, OpenAIApi } = require('openai');
-const fetch = require('node-fetch');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const fetch = require('node-fetch');
 
 const { createWallet } = require('./wasm_rpc');
 const User = require('./models/User');
@@ -27,187 +26,189 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback){
-    if(!origin) return callback(null,true);
-    if(allowedOrigins.indexOf(origin)===-1){
-      const msg=`The CORS policy for this site does not allow access from ${origin}`;
-      return callback(new Error(msg),false);
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = `The CORS policy for this site does not allow access from ${origin}`;
+      return callback(new Error(msg), false);
     }
-    return callback(null,true);
+    return callback(null, true);
   },
-  methods:["GET","POST","OPTIONS"],
-  allowedHeaders:["Content-Type","Authorization"]
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(bodyParser.json());
 
 // ------------------ Connect to MongoDB ------------------
-mongoose.connect(process.env.MONGO_URI,{
-  useNewUrlParser:true,
-  useUnifiedTopology:true
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 })
-.then(()=> console.log('Connected to MongoDB'))
-.catch(err=>{
-  console.error('Failed to connect to MongoDB:',err);
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => {
+  console.error('Failed to connect to MongoDB:', err);
   process.exit(1);
 });
 
 /**
- * Create an OpenAI client for TEXT completions
- * (Previously called "deepseek", but now it's GPT-4).
+ * Create a Qwen client for text completions.
+ * Note: Qwen is Alibaba Cloud’s product.
+ * We now use DASHSCOPE_API_KEY and the Qwen-compatible base URL.
  */
-const openAiTextConfig = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-  basePath: 'https://api.openai.com/v1'
+const OpenAI = require("openai");
+const qwen = new OpenAI({
+  apiKey: process.env.DASHSCOPE_API_KEY,
+  baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 });
-const openAiText = new OpenAIApi(openAiTextConfig);
 
 /**
  * Create another OpenAI client for DALL·E 3 images
- * (We keep them separate, but they use the same API key.)
+ * (We keep these separate; they use the OpenAI API.)
  */
+const { Configuration, OpenAIApi } = require('openai');
 const openaiImagesConfig = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
-  basePath: 'https://api.openai.com/v1'
+  baseURL: "https://api.openai.com/v1"
 });
 const openaiImages = new OpenAIApi(openaiImagesConfig);
 
 /**************************************************
  * In-Memory
  **************************************************/
-const progressMap={};
+const progressMap = {};
 function generateRequestId(){
   return crypto.randomBytes(8).toString('hex');
 }
 function sanitizeFilename(name){
-  return name.replace(/[^a-zA-Z0-9_-]/g,"_");
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 /**************************************************
  * GET /
  **************************************************/
-app.get('/',(req,res)=>{
+app.get('/', (req, res) => {
   res.send('KasperCoin Website Builder API is running!');
 });
 
 /**************************************************
  * POST /start-generation (1 credit)
  **************************************************/
-app.post('/start-generation', async(req,res)=>{
-  const { walletAddress, userInputs }=req.body;
-  if(!walletAddress||!userInputs){
-    return res.status(400).json({error:"walletAddress and userInputs are required."});
+app.post('/start-generation', async (req, res) => {
+  const { walletAddress, userInputs } = req.body;
+  if (!walletAddress || !userInputs) {
+    return res.status(400).json({ error: "walletAddress and userInputs are required." });
   }
-  const { coinName, colorPalette, projectType, themeSelection, projectDesc }= userInputs;
-  if(!projectType||!['nft','token'].includes(projectType.toLowerCase())){
-    return res.status(400).json({error:"projectType must be 'nft' or 'token'."});
+  const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs;
+  if (!projectType || !['nft', 'token'].includes(projectType.toLowerCase())) {
+    return res.status(400).json({ error: "projectType must be 'nft' or 'token'." });
   }
-  if(!themeSelection||!['dark','light'].includes(themeSelection.toLowerCase())){
-    return res.status(400).json({error:"themeSelection must be 'dark' or 'light'."});
+  if (!themeSelection || !['dark', 'light'].includes(themeSelection.toLowerCase())) {
+    return res.status(400).json({ error: "themeSelection must be 'dark' or 'light'." });
   }
 
-  try{
+  try {
     // Deduct 1 credit
-    const user= await User.findOneAndUpdate(
-      {walletAddress,credits:{$gte:1}},
-      {$inc:{credits:-1}},
-      {new:true}
+    const user = await User.findOneAndUpdate(
+      { walletAddress, credits: { $gte: 1 } },
+      { $inc: { credits: -1 } },
+      { new: true }
     );
-    if(!user){
-      return res.status(400).json({error:"Insufficient credits or invalid wallet address."});
+    if (!user) {
+      return res.status(400).json({ error: "Insufficient credits or invalid wallet address." });
     }
 
-    const requestId= generateRequestId();
-    progressMap[requestId]={
-      status:'in-progress',
-      progress:0,
-      code:null,
-      images:{}
+    const requestId = generateRequestId();
+    progressMap[requestId] = {
+      status: 'in-progress',
+      progress: 0,
+      code: null,
+      images: {}
     };
 
-    doWebsiteGeneration(requestId,userInputs,user).catch(err=>{
-      console.error("Background generation error:",err);
-      progressMap[requestId].status='error';
-      progressMap[requestId].progress=100;
-      // Refund
-      User.findOneAndUpdate({walletAddress},{$inc:{credits:1}})
-      .catch(refundErr=>console.error("Failed to refund credit:",refundErr));
+    doWebsiteGeneration(requestId, userInputs, user).catch(err => {
+      console.error("Background generation error:", err);
+      progressMap[requestId].status = 'error';
+      progressMap[requestId].progress = 100;
+      // Refund credit
+      User.findOneAndUpdate({ walletAddress }, { $inc: { credits: 1 } })
+      .catch(refundErr => console.error("Failed to refund credit:", refundErr));
     });
 
-    return res.json({requestId});
-  } catch(err){
-    console.error("Error starting generation:",err);
-    return res.status(500).json({error:"Internal server error."});
+    return res.json({ requestId });
+  } catch (err) {
+    console.error("Error starting generation:", err);
+    return res.status(500).json({ error: "Internal server error." });
   }
 });
 
 /**************************************************
  * GET /progress?requestId=XYZ
  **************************************************/
-app.get('/progress',(req,res)=>{
-  const {requestId}= req.query;
-  if(!requestId||!progressMap[requestId]){
-    return res.status(400).json({error:"Invalid or missing requestId"});
+app.get('/progress', (req, res) => {
+  const { requestId } = req.query;
+  if (!requestId || !progressMap[requestId]) {
+    return res.status(400).json({ error: "Invalid or missing requestId" });
   }
-  const {status,progress}= progressMap[requestId];
-  return res.json({status,progress});
+  const { status, progress } = progressMap[requestId];
+  return res.json({ status, progress });
 });
 
 /**************************************************
  * GET /result?requestId=XYZ
  **************************************************/
-app.get('/result',(req,res)=>{
-  const {requestId}= req.query;
-  if(!requestId||!progressMap[requestId]){
-    return res.status(400).json({error:"Invalid or missing requestId"});
+app.get('/result', (req, res) => {
+  const { requestId } = req.query;
+  if (!requestId || !progressMap[requestId]) {
+    return res.status(400).json({ error: "Invalid or missing requestId" });
   }
-  const {status,code,images}= progressMap[requestId];
-  if(status!=='done'){
-    return res.status(400).json({error:"Not finished or generation error."});
+  const { status, code, images } = progressMap[requestId];
+  if (status !== 'done') {
+    return res.status(400).json({ error: "Not finished or generation error." });
   }
-  let finalCode= code;
-  if(images.navLogo){
-    finalCode= finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
+  let finalCode = code;
+  if (images.navLogo) {
+    finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
   }
-  if(images.heroBg){
-    finalCode= finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
+  if (images.heroBg) {
+    finalCode = finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
   }
-  if(images.footerImg){
-    finalCode= finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
+  if (images.footerImg) {
+    finalCode = finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
   }
-  return res.json({code:finalCode});
+  return res.json({ code: finalCode });
 });
 
 /**************************************************
  * GET /export?requestId=XYZ&type=full|wordpress
  **************************************************/
-app.get('/export',(req,res)=>{
-  const {requestId,type}= req.query;
-  if(!requestId||!progressMap[requestId]){
-    return res.status(400).json({error:"Invalid or missing requestId"});
+app.get('/export', (req, res) => {
+  const { requestId, type } = req.query;
+  if (!requestId || !progressMap[requestId]) {
+    return res.status(400).json({ error: "Invalid or missing requestId" });
   }
-  const {status,code,images}= progressMap[requestId];
-  if(status!=='done'){
-    return res.status(400).json({error:"Generation not completed or encountered an error."});
+  const { status, code, images } = progressMap[requestId];
+  if (status !== 'done') {
+    return res.status(400).json({ error: "Generation not completed or encountered an error." });
   }
-  if(!type||!['full','wordpress'].includes(type)){
-    return res.status(400).json({error:"Invalid or missing export type. Use 'full' or 'wordpress'."});
+  if (!type || !['full', 'wordpress'].includes(type)) {
+    return res.status(400).json({ error: "Invalid or missing export type. Use 'full' or 'wordpress'." });
   }
-  let finalCode= code;
-  if(images.navLogo){
-    finalCode= finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
+  let finalCode = code;
+  if (images.navLogo) {
+    finalCode = finalCode.replace(/NAV_IMAGE_PLACEHOLDER/g, images.navLogo);
   }
-  if(images.heroBg){
-    finalCode= finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
+  if (images.heroBg) {
+    finalCode = finalCode.replace(/HERO_BG_PLACEHOLDER/g, images.heroBg);
   }
-  if(images.footerImg){
-    finalCode= finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
+  if (images.footerImg) {
+    finalCode = finalCode.replace(/FOOTER_IMAGE_PLACEHOLDER/g, images.footerImg);
   }
-  const filename= sanitizeFilename(requestId);
-  if(type==='full'){
-    res.setHeader('Content-Type','text/html');
-    res.setHeader('Content-Disposition',`attachment; filename="${filename}_website.html"`);
+  const filename = sanitizeFilename(requestId);
+  if (type === 'full') {
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}_website.html"`);
     return res.send(finalCode);
   } else {
-    const wpTemplate=`<?php
+    const wpTemplate = `<?php
 /**
  * Template Name: ${filename}_Generated_Website
  */
@@ -219,8 +220,8 @@ ${finalCode}
 
 <?php get_footer(); ?>
 `;
-    res.setHeader('Content-Type','application/php');
-    res.setHeader('Content-Disposition',`attachment; filename="${filename}_generated_website.php"`);
+    res.setHeader('Content-Type', 'application/php');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}_generated_website.php"`);
     return res.send(wpTemplate);
   }
 });
@@ -228,187 +229,187 @@ ${finalCode}
 /**************************************************
  * GET /get-credits?walletAddress=XYZ
  **************************************************/
-app.get('/get-credits', async(req,res)=>{
-  const {walletAddress}= req.query;
-  if(!walletAddress){
-    return res.status(400).json({success:false,error:"walletAddress is required."});
+app.get('/get-credits', async (req, res) => {
+  const { walletAddress } = req.query;
+  if (!walletAddress) {
+    return res.status(400).json({ success: false, error: "walletAddress is required." });
   }
-  try{
-    const user= await User.findOne({walletAddress});
-    if(!user){
-      return res.status(400).json({success:false,error:"Invalid wallet address."});
+  try {
+    const user = await User.findOne({ walletAddress });
+    if (!user) {
+      return res.status(400).json({ success: false, error: "Invalid wallet address." });
     }
-    return res.json({success:true, credits:user.credits});
-  }catch(err){
-    console.error("Error fetching credits:",err);
-    return res.status(500).json({success:false,error:"Internal server error."});
+    return res.json({ success: true, credits: user.credits });
+  } catch (err) {
+    console.error("Error fetching credits:", err);
+    return res.status(500).json({ success: false, error: "Internal server error." });
   }
 });
 
 /**************************************************
  * POST /create-wallet
  **************************************************/
-app.post('/create-wallet', async(req,res)=>{
-  const {username,password}= req.body;
-  if(!username||!password){
-    return res.status(400).json({success:false,error:"Username and password are required."});
+app.post('/create-wallet', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: "Username and password are required." });
   }
-  try{
-    const existingUser=await User.findOne({username});
-    if(existingUser){
-      return res.status(400).json({success:false,error:"Username already exists. Please choose another one."});
+  try {
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: "Username already exists. Please choose another one." });
     }
-    const walletData=await createWallet();
-    if(!walletData.success){
-      return res.status(500).json({success:false,error:"Wallet creation failed."});
+    const walletData = await createWallet();
+    if (!walletData.success) {
+      return res.status(500).json({ success: false, error: "Wallet creation failed." });
     }
-    const {receivingAddress,xPrv,mnemonic}=walletData;
-    const saltRounds=10;
-    const passwordHash=await bcrypt.hash(password,saltRounds);
+    const { receivingAddress, xPrv, mnemonic } = walletData;
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    const newUser=new User({
+    const newUser = new User({
       username,
-      walletAddress:receivingAddress,
+      walletAddress: receivingAddress,
       passwordHash,
       xPrv,
       mnemonic,
-      credits:1,
-      generatedFiles:[]
+      credits: 1,
+      generatedFiles: []
     });
     await newUser.save();
-    return res.json({success:true, walletAddress:receivingAddress});
-  }catch(err){
-    if(err.code===11000&&err.keyPattern&&err.keyPattern.username){
-      return res.status(400).json({success:false,error:"Username already exists. Please choose another one."});
+    return res.json({ success: true, walletAddress: receivingAddress });
+  } catch (err) {
+    if (err.code === 11000 && err.keyPattern && err.keyPattern.username) {
+      return res.status(400).json({ success: false, error: "Username already exists. Please choose another one." });
     }
-    console.error("Error creating wallet:",err);
-    return res.status(500).json({success:false,error:"Internal server error."});
+    console.error("Error creating wallet:", err);
+    return res.status(500).json({ success: false, error: "Internal server error." });
   }
 });
 
 /**************************************************
  * POST /connect-wallet
  **************************************************/
-app.post('/connect-wallet', async(req,res)=>{
-  const {walletAddress,password}= req.body;
-  if(!walletAddress||!password){
-    return res.status(400).json({success:false,error:"Wallet address and password are required."});
+app.post('/connect-wallet', async (req, res) => {
+  const { walletAddress, password } = req.body;
+  if (!walletAddress || !password) {
+    return res.status(400).json({ success: false, error: "Wallet address and password are required." });
   }
-  try{
-    const user=await User.findOne({walletAddress});
-    if(!user){
-      return res.status(400).json({success:false,error:"Invalid wallet address or password."});
+  try {
+    const user = await User.findOne({ walletAddress });
+    if (!user) {
+      return res.status(400).json({ success: false, error: "Invalid wallet address or password." });
     }
-    const match=await bcrypt.compare(password,user.passwordHash);
-    if(!match){
-      return res.status(400).json({success:false,error:"Invalid wallet address or password."});
+    const match = await bcrypt.compare(password, user.passwordHash);
+    if (!match) {
+      return res.status(400).json({ success: false, error: "Invalid wallet address or password." });
     }
     return res.json({
-      success:true,
-      username:user.username,
-      walletAddress:user.walletAddress,
-      credits:user.credits,
-      generatedFiles:user.generatedFiles
+      success: true,
+      username: user.username,
+      walletAddress: user.walletAddress,
+      credits: user.credits,
+      generatedFiles: user.generatedFiles
     });
-  }catch(err){
-    console.error("Error connecting wallet:",err);
-    return res.status(500).json({success:false,error:"Internal server error."});
+  } catch (err) {
+    console.error("Error connecting wallet:", err);
+    return res.status(500).json({ success: false, error: "Internal server error." });
   }
 });
 
 /**************************************************
  * POST /scan-deposits
  **************************************************/
-app.post('/scan-deposits', async(req,res)=>{
-  const {walletAddress}= req.body;
-  if(!walletAddress){
-    return res.status(400).json({success:false,error:"Missing walletAddress"});
+app.post('/scan-deposits', async (req, res) => {
+  const { walletAddress } = req.body;
+  if (!walletAddress) {
+    return res.status(400).json({ success: false, error: "Missing walletAddress" });
   }
-  try{
+  try {
     await fetchAndProcessUserDeposits(walletAddress);
-    const user=await User.findOne({walletAddress});
-    if(!user){
-      return res.status(404).json({success:false,error:"User not found"});
+    const user = await User.findOne({ walletAddress });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
     }
-    return res.json({success:true, credits:user.credits});
-  }catch(err){
-    console.error("Error scanning deposits on demand:",err);
-    return res.status(500).json({success:false,error:"Failed to scan deposits"});
+    return res.json({ success: true, credits: user.credits });
+  } catch (err) {
+    console.error("Error scanning deposits on demand:", err);
+    return res.status(500).json({ success: false, error: "Failed to scan deposits" });
   }
 });
 
 /**************************************************
  * POST /save-generated-file
  **************************************************/
-app.post('/save-generated-file', async(req,res)=>{
-  const {walletAddress,requestId,content}= req.body;
-  if(!walletAddress||!requestId||!content){
-    return res.status(400).json({success:false,error:"All fields are required."});
+app.post('/save-generated-file', async (req, res) => {
+  const { walletAddress, requestId, content } = req.body;
+  if (!walletAddress || !requestId || !content) {
+    return res.status(400).json({ success: false, error: "All fields are required." });
   }
-  try{
-    const user=await User.findOne({walletAddress});
-    if(!user){
-      return res.status(400).json({success:false,error:"Invalid wallet address."});
+  try {
+    const user = await User.findOne({ walletAddress });
+    if (!user) {
+      return res.status(400).json({ success: false, error: "Invalid wallet address." });
     }
     user.generatedFiles.push({
       requestId,
       content,
-      generatedAt:new Date()
+      generatedAt: new Date()
     });
     await user.save();
-    return res.json({success:true});
-  }catch(err){
-    console.error("Error saving generated file:",err);
-    return res.status(500).json({success:false,error:"Internal server error."});
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Error saving generated file:", err);
+    return res.status(500).json({ success: false, error: "Internal server error." });
   }
 });
 
 /**************************************************
  * GET /get-user-generations?walletAddress=XYZ
  **************************************************/
-app.get('/get-user-generations', async(req,res)=>{
-  const {walletAddress}= req.query;
-  if(!walletAddress){
-    return res.status(400).json({success:false,error:"Missing walletAddress."});
+app.get('/get-user-generations', async (req, res) => {
+  const { walletAddress } = req.query;
+  if (!walletAddress) {
+    return res.status(400).json({ success: false, error: "Missing walletAddress." });
   }
-  try{
-    const user=await User.findOne({walletAddress}).lean();
-    if(!user){
-      return res.status(404).json({success:false,error:"User not found."});
+  try {
+    const user = await User.findOne({ walletAddress }).lean();
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found." });
     }
-    const files=user.generatedFiles||[];
-    res.setHeader('Content-Type','application/json');
+    const files = user.generatedFiles || [];
+    res.setHeader('Content-Type', 'application/json');
     req.setTimeout(0);
     res.setTimeout(0);
 
     res.write('{"success":true,"generatedFiles":[');
-    for(let i=0;i<files.length;i++){
-      if(i>0)res.write(',');
+    for (let i = 0; i < files.length; i++) {
+      if (i > 0) res.write(',');
       res.write(JSON.stringify({
-        requestId:files[i].requestId,
-        content:files[i].content,
-        generatedAt:files[i].generatedAt
+        requestId: files[i].requestId,
+        content: files[i].content,
+        generatedAt: files[i].generatedAt
       }));
       // flush chunk
-      await new Promise(resolve=>setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
     }
     res.write(']}');
     res.end();
-  }catch(err){
-    console.error("Error in get-user-generations:",err);
-    return res.status(500).json({success:false,error:"Internal server error."});
+  } catch (err) {
+    console.error("Error in get-user-generations:", err);
+    return res.status(500).json({ success: false, error: "Internal server error." });
   }
 });
 
 /**************************************************
  * MAIN background generation function
  **************************************************/
-async function doWebsiteGeneration(requestId, userInputs, user){
-  try{
+async function doWebsiteGeneration(requestId, userInputs, user) {
+  try {
     const { coinName, colorPalette, projectType, themeSelection, projectDesc } = userInputs || {};
     progressMap[requestId].progress = 10;
 
-    const snippetInspiration=`
+    const snippetInspiration = `
 <html>
 <head>
   <style>
@@ -423,8 +424,8 @@ async function doWebsiteGeneration(requestId, userInputs, user){
       animation: shimmerMove 2s infinite;
     }
     @keyframes shimmerMove {
-      0% { background-position:-200% 0;}
-      100%{ background-position:200% 0;}
+      0% { background-position:-200% 0; }
+      100% { background-position:200% 0; }
     }
   </style>
 </head>
@@ -434,7 +435,7 @@ async function doWebsiteGeneration(requestId, userInputs, user){
 </html>
 `;
 
-    let systemPrompt=`
+    let systemPrompt = `
     You are a website building ai for my app. Create a full finished beautiful site each time and Generate the single HTML file with EXACT comment markers for each section: 
 <!-- SECTION: nav -->, <!-- END: NAV --> .  and the file must be like this <!DOCTYPE html>
 <html>
@@ -462,7 +463,7 @@ ${snippetInspiration}
     `;
 
     // If NFT or token, add more specifics
-    if(projectType.toLowerCase() === 'nft'){
+    if (projectType.toLowerCase() === 'nft') {
       systemPrompt += `
 the file must be like this <!DOCTYPE html>
 <html>
@@ -511,11 +512,11 @@ You are a website building ai now building a site for the crypto token "${coinNa
 
     progressMap[requestId].progress = 20;
 
-    // TEXT GENERATION via GPT using openAiText.createChatCompletion
+    // TEXT GENERATION via Qwen using qwen.chat.completions.create
     let gptResponse;
     try {
-      gptResponse = await openAiText.createChatCompletion({
-        model: "o3-mini",  
+      gptResponse = await qwen.chat.completions.create({
+        model: "qwen-plus",
         messages: [
           { role: "system", content: systemPrompt },
           {
@@ -539,28 +540,28 @@ All advanced animations, glass styling, etc.
 make sure its formatted for GrapesJS.
 `
           }
-        ],
+        ]
       });
     } catch (err) {
       if (err.response && err.response.status === 429) {
-        console.error("OpenAI rate limit error in doWebsiteGeneration:", err.response.data);
-        progressMap[requestId].status='error';
-        progressMap[requestId].progress=100;
+        console.error("Qwen rate limit error in doWebsiteGeneration:", err.response.data);
+        progressMap[requestId].status = 'error';
+        progressMap[requestId].progress = 100;
         return;
       }
       throw err;
     }
 
-    let siteCode = gptResponse.data.choices[0].message.content.trim();
+    let siteCode = gptResponse.choices[0].message.content.trim();
     progressMap[requestId].progress = 60;
 
-    // remove leftover code fences
-    siteCode = siteCode.replace(/```+/g,"");
+    // Remove leftover code fences if any
+    siteCode = siteCode.replace(/```+/g, "");
 
     // Save final code
     progressMap[requestId].code = siteCode;
-    progressMap[requestId].status='done';
-    progressMap[requestId].progress=100;
+    progressMap[requestId].status = 'done';
+    progressMap[requestId].progress = 100;
 
     // Save to DB
     user.generatedFiles.push({
@@ -570,10 +571,10 @@ make sure its formatted for GrapesJS.
     });
     await user.save();
 
-  } catch(error){
+  } catch (error) {
     console.error("Error in background generation:", error);
-    progressMap[requestId].status='error';
-    progressMap[requestId].progress=100;
+    progressMap[requestId].status = 'error';
+    progressMap[requestId].progress = 100;
   }
 }
 
@@ -581,21 +582,21 @@ make sure its formatted for GrapesJS.
  * POST /generate-section => refresh single section
  * (Removes partial image generation)
  **************************************************/
-app.post('/generate-section', async(req,res)=>{
-  const {walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc}=req.body;
-  if(!walletAddress||!section){
-    return res.status(400).json({error:"Missing walletAddress or section."});
+app.post('/generate-section', async (req, res) => {
+  const { walletAddress, section, coinName, colorPalette, projectType, themeSelection, projectDesc } = req.body;
+  if (!walletAddress || !section) {
+    return res.status(400).json({ error: "Missing walletAddress or section." });
   }
-  try{
-    const user=await User.findOne({walletAddress});
-    if(!user){
-      return res.status(400).json({error:"Invalid wallet address."});
+  try {
+    const user = await User.findOne({ walletAddress });
+    if (!user) {
+      return res.status(400).json({ error: "Invalid wallet address." });
     }
-    if(user.credits<0.25){
-      return res.status(400).json({error:"Insufficient credits (need 0.25)."});
+    if (user.credits < 0.25) {
+      return res.status(400).json({ error: "Insufficient credits (need 0.25)." });
     }
-    // Deduct .25
-    user.credits-=0.25;
+    // Deduct 0.25 credit
+    user.credits -= 0.25;
     await user.save();
 
     let systemPrompt = `
@@ -625,55 +626,55 @@ Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinNa
 Use snippet below for partial inspiration (no code fences):
 `;
 
-    const gptResp = await openAiText.createChatCompletion({
-      model: "o3-mini",
+    const gptResp = await qwen.chat.completions.create({
+      model: "qwen-plus",
       messages: [
-        {role:"system", content:systemPrompt},
+        { role: "system", content: systemPrompt },
         {
-          role:"user",
-          content:`Generate ONLY that [${section}] snippet with markers. For example: 
+          role: "user",
+          content: `Generate ONLY that [${section}] snippet with markers. For example: 
 <!DOCTYPE html><html><head>...<body>... plus the correct comment markers. 
 No leftover code fences. 
 Fully responsive.`
         }
       ],
-      max_tokens:2000,
-      temperature:0.7
+      max_tokens: 2000,
+      temperature: 0.7
     });
 
-    let snippet= gptResp.data.choices[0].message.content.trim();
-    snippet= snippet.replace(/```+/g,"");
+    let snippet = gptResp.choices[0].message.content.trim();
+    snippet = snippet.replace(/```+/g, "");
 
     return res.json({
       snippet,
-      images:{}, // no images generated
+      images: {}, // no images generated
       newCredits: user.credits
     });
-  } catch(err){
+  } catch (err) {
     console.error("Error in /generate-section:", err);
-    return res.status(500).json({error:"Internal server error."});
+    return res.status(500).json({ error: "Internal server error." });
   }
 });
 
 /**************************************************
  * Error Handling
  **************************************************/
-app.use((err,req,res,next)=>{
-  if(err instanceof SyntaxError){
-    console.error("Syntax Error:",err);
-    return res.status(400).json({error:"Invalid JSON payload."});
-  } else if(err.message && err.message.startsWith('The CORS policy')){
-    console.error("CORS Error:",err.message);
-    return res.status(403).json({error:err.message});
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError) {
+    console.error("Syntax Error:", err);
+    return res.status(400).json({ error: "Invalid JSON payload." });
+  } else if (err.message && err.message.startsWith('The CORS policy')) {
+    console.error("CORS Error:", err.message);
+    return res.status(403).json({ error: err.message });
   }
   console.error("Unhandled Error:", err.stack);
-  res.status(500).json({error:"Something went wrong!"});
+  res.status(500).json({ error: "Something went wrong!" });
 });
 
 /**************************************************
  * Launch
  **************************************************/
-const PORT=process.env.PORT||5000;
-app.listen(PORT,()=>{
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
   console.log(`KasperCoin Website Builder API running on port ${PORT}!`);
 });
