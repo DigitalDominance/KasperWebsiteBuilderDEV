@@ -511,10 +511,10 @@ You are a website building ai now building a site for the crypto token "${coinNa
 
     progressMap[requestId].progress = 20;
 
-    // TEXT GENERATION via GPT
+    // TEXT GENERATION via GPT using openAiText.createChatCompletion
     let gptResponse;
     try {
-      gptResponse = await openai.chat.completions.create({
+      gptResponse = await openAiText.createChatCompletion({
         model: "o3-mini",  
         messages: [
           { role: "system", content: systemPrompt },
