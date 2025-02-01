@@ -51,10 +51,10 @@ mongoose.connect(process.env.MONGO_URI, {
 
 /**
  * Create a Qwen client for text completions.
- * We use the OpenAI SDK’s default export.
+ * We use the named export "OpenAI" from the OpenAI SDK.
  * Note: You must set DASHSCOPE_API_KEY in your environment.
  */
-const OpenAI = require("openai").default;
+const { OpenAI } = require("openai");
 const qwen = new OpenAI({
   apiKey: process.env.DASHSCOPE_API_KEY,
   baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
