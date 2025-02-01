@@ -516,7 +516,7 @@ You are a website building ai now building a site for the crypto token "${coinNa
     let gptResponse;
     try {
       gptResponse = await qwen.chat.completions.create({
-        model: "qwen-plus",
+        model: "qwen-max-2025-01-25",
         messages: [
           { role: "system", content: systemPrompt },
           {
