@@ -50,19 +50,8 @@ mongoose.connect(process.env.MONGO_URI, {
 });
 
 /**
- * Create a Qwen client for text completions.
- * We use the named export "OpenAI" from the OpenAI SDK.
- * Note: You must set DASHSCOPE_API_KEY in your environment.
- */
-const { OpenAI } = require("openai");
-const qwen = new OpenAI({
-  apiKey: process.env.DASHSCOPE_API_KEY,
-  baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-});
-
-/**
  * Create another OpenAI client for DALL·E 3 images
- * (Uses the OpenAI API.)
+ * (Uses the official OpenAI API for images.)
  */
 const { Configuration, OpenAIApi } = require('openai');
 const openaiImagesConfig = new Configuration({
@@ -80,6 +69,42 @@ function generateRequestId(){
 }
 function sanitizeFilename(name){
   return name.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+/**************************************************
+ * QWEN HELPER (direct fetch)
+ * We'll manually call the Qwen endpoint with a
+ * POST request. The body is "OpenAI-compatible."
+ **************************************************/
+async function callQwen(model, messages, options = {}) {
+  // Qwen endpoint
+  const url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
+  const apiKey = process.env.DASHSCOPE_API_KEY; // must be set in Heroku env
+
+  const body = {
+    model,
+    messages,
+    ...options
+  };
+
+  // POST request via node-fetch
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    // attempt to parse the error body
+    const errText = await response.text();
+    throw new Error(`Qwen API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  return data;
 }
 
 /**************************************************
@@ -403,6 +428,7 @@ app.get('/get-user-generations', async (req, res) => {
 
 /**************************************************
  * MAIN background generation function
+ * (Replaces the Qwen "openai" usage with direct fetch.)
  **************************************************/
 async function doWebsiteGeneration(requestId, userInputs, user) {
   try {
@@ -467,7 +493,7 @@ ${snippetInspiration}
       systemPrompt += `
 the file must be like this <!DOCTYPE html>
 <html>
-<head>
+head
   <meta charset="utf-8"/>
   <style>
 {css}
@@ -512,12 +538,12 @@ You are a website building ai now building a site for the crypto token "${coinNa
 
     progressMap[requestId].progress = 20;
 
-    // TEXT GENERATION via Qwen using qwen.chat.completions.create
+    // QWEN Chat Completion
     let gptResponse;
     try {
-      gptResponse = await qwen.chat.completions.create({
-        model: "qwen-max-2025-01-25",
-        messages: [
+      gptResponse = await callQwen(
+        "qwen-max-2025-01-25",
+        [
           { role: "system", content: systemPrompt },
           {
             role: "user",
@@ -541,10 +567,11 @@ make sure its formatted for GrapesJS.
 `
           }
         ]
-      });
+      );
     } catch (err) {
-      if (err.response && err.response.status === 429) {
-        console.error("Qwen rate limit error in doWebsiteGeneration:", err.response.data);
+      if (err.message.includes("429")) {
+        // If it's a rate limit error
+        console.error("Qwen rate limit error in doWebsiteGeneration:", err.message);
         progressMap[requestId].status = 'error';
         progressMap[requestId].progress = 100;
         return;
@@ -626,9 +653,9 @@ Generate ONLY the [${section}] snippet for a ${projectType} site named "${coinNa
 Use snippet below for partial inspiration (no code fences):
 `;
 
-    const gptResp = await qwen.chat.completions.create({
-      model: "qwen-plus",
-      messages: [
+    const gptResp = await callQwen(
+      "qwen-plus",
+      [
         { role: "system", content: systemPrompt },
         {
           role: "user",
@@ -638,16 +665,18 @@ No leftover code fences.
 Fully responsive.`
         }
       ],
-      max_tokens: 2000,
-      temperature: 0.7
-    });
+      {
+        max_tokens: 2000,
+        temperature: 0.7
+      }
+    );
 
     let snippet = gptResp.choices[0].message.content.trim();
     snippet = snippet.replace(/```+/g, "");
 
     return res.json({
       snippet,
-      images: {}, // no images generated
+      images: {}, // no images generated in this route
       newCredits: user.credits
     });
   } catch (err) {
