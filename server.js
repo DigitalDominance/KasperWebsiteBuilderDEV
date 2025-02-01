@@ -515,7 +515,7 @@ You are a website building ai now building a site for the crypto token "${coinNa
     let gptResponse;
     try {
       gptResponse = await openAiText.createChatCompletion({
-        model: "gpt-4o-mini",  
+        model: "o1-mini",  
         messages: [
           { role: "system", content: systemPrompt },
           {
