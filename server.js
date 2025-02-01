@@ -514,7 +514,7 @@ You are a website building ai now building a site for the crypto token "${coinNa
     // TEXT GENERATION via GPT
     let gptResponse;
     try {
-      gptResponse = await openAiText.createChatCompletion({
+      gptResponse = await openai.chat.completions.create({
         model: "o3-mini",  
         messages: [
           { role: "system", content: systemPrompt },
@@ -540,8 +540,6 @@ make sure its formatted for GrapesJS.
 `
           }
         ],
-        temperature: 0.7,
-        max_tokens: 5000
       });
     } catch (err) {
       if (err.response && err.response.status === 429) {
